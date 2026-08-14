@@ -2,8 +2,9 @@
 ## gate: production_validation
 $ bash scripts/validate.sh
 check passed: galleypack.kujo
-12 passed; 0 failed
+13 passed; 0 failed
 9 passed; 0 failed
+4 passed; 0 failed
 5 passed; 0 failed
 GalleyPack validation passed.
 gate production_validation: pass
