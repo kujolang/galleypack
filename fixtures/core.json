@@ -1,1 +1,6 @@
-{"schema_version":"1.0.0","title":"GalleyPack fixture","provenance":[{"kind":"fixture","source":"fixtures/core.json"}],"classification":"observed","verdict":"unverified","blocking_findings":[],"human_actor":"fixture-human","package_id":"package-fixture","package_version":"1","manifest_checksum":"fixture-checksum","destination":"fixture-local","action":"publish","approval_id":"approval-fixture","authorized_action":"publish"}
+{
+  "schema_version": "1.0.0",
+  "artifact_kind": "article",
+  "title": "Offline package artifact",
+  "provenance": [{"kind": "fixture", "source": "fixtures/core.json"}]
+}

@@ -1,0 +1,12 @@
+from src.common import get, has
+export func record_type(command){if command=="add"{return "artifact"};if command=="relate"{return "artifact_relationship"};if command=="evidence attach"{return "evidence_attachment"};if command=="review attach"{return "review_attachment"};if command=="build"||command=="freeze"{return "package_version"};return replace_str(command," ","_")}
+export func id_prefix(command){kind:=record_type(command);if kind=="artifact_relationship"{return "relationship"};if kind=="evidence_attachment"{return "evidence-link"};if kind=="review_attachment"{return "review-link"};if kind=="package_version"{return "package"};return replace_str(kind,"_","-")}
+func require_text(payload,key){value:=get(payload,key,"");if type(value)!="string"||trim(value)==""{return "missing required field: "+key};if len(value)>16384{return "field exceeds 16 KiB: "+key};return ""}
+export func validate_command(command,payload,artifact){
+    if command=="add"{if type(artifact)!="dict"{return "add requires --path"};return require_text(payload,"artifact_kind")}
+    if command=="relate"{for key in ["artifact_id","related_artifact_id","relationship"]{error:=require_text(payload,key);if error!=""{return error}};if !has(["source","derivative","adaptation","variant","replacement"],payload["relationship"]){return "invalid artifact relationship"}}
+    if command=="evidence attach"{for key in ["artifact_id","evidence_id"]{error:=require_text(payload,key);if error!=""{return error}}}
+    if command=="review attach"{for key in ["package_id","review_id","verdict"]{error:=require_text(payload,key);if error!=""{return error}}}
+    if command=="build"||command=="freeze"{for key in ["package_id","package_version"]{error:=require_text(payload,key);if error!=""{return error}};if type(get(payload,"artifact_ids",null))!="array"||len(payload["artifact_ids"])==0{return "package requires artifact_ids"};if type(artifact)!="dict"{return command+" requires --path to the exact manifest or package artifact"}}
+    return ""
+}

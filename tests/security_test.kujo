@@ -1,0 +1,15 @@
+from src.core import dispatch
+from src.args import parse_args
+mut passed:=0;mut failed:=0
+func check(ok,label){if ok{passed=passed+1}else{failed=failed+1;eprint("FAIL: "+label)}}
+func opts(v){return parse_args(v,["json","dry-run","force"])}
+root:="/tmp/galleypack-security-"+uuid_v4();artifact:=root+"-artifact";write_file(artifact,"safe",true)
+check(!dispatch("init",opts(["--state",root+"/../escape"]))["ok"],"state traversal")
+secret:=root+"-secret.json";write_file(secret,"{\"schema_version\":\"1.0.0\",\"artifact_kind\":\"article\",\"token\":\"nope\"}",true)
+check(!dispatch("add",opts(["--state",root,"--input",secret,"--path",artifact,"--actor","producer"]))["ok"],"secret rejection")
+check(!dispatch("add",opts(["--state",root,"--input","fixtures/core.json","--path",artifact,"--actor","producer","--timestamp","bad"]))["ok"],"timestamp validation")
+check(!dispatch("show",opts(["--state",root,"--id","../escape"]))["ok"],"record traversal")
+created:=dispatch("add",opts(["--state",root,"--input","fixtures/core.json","--path",artifact,"--actor","producer","--id","artifact-secure","--timestamp","2026-08-14T04:00:00Z"]));check(created["ok"],"secure create")
+create_dir(root+"/locks/artifact-locked.lock");check(!dispatch("add",opts(["--state",root,"--input","fixtures/core.json","--path",artifact,"--actor","producer","--id","artifact-locked","--timestamp","2026-08-14T04:00:01Z"]))["ok"],"lock conflict");os_rmdir(root+"/locks/artifact-locked.lock")
+delete_file(secret);delete_file(artifact)
+print(to_string(passed)+" passed; "+to_string(failed)+" failed");if failed>0{exit(1)}

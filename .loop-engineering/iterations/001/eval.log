@@ -1,0 +1,13 @@
+
+## gate: production_validation
+$ bash scripts/validate.sh
+check passed: galleypack.kujo
+12 passed; 0 failed
+6 passed; 0 failed
+5 passed; 0 failed
+GalleyPack validation passed.
+gate production_validation: pass
+
+## gate: diff_check
+$ git diff --check
+gate diff_check: pass

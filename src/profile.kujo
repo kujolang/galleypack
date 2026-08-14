@@ -1,0 +1,11 @@
+export func profile() {
+    return {
+        "slug": "galleypack", "name": "GalleyPack", "version": "0.1.0", "contract_version": "1.0.0", "default_state": ".galleypack",
+        "description": "Versioned editorial production packages with artifact checksums, lineage, evidence, reviews, freeze, and deterministic drift verification.",
+        "commands": ["add", "relate", "evidence attach", "review attach", "claims compare", "build", "freeze", "validate", "diff", "show", "export", "doctor", "version", "init", "report", "history"],
+        "read_commands": ["claims compare", "validate", "diff", "show", "export", "doctor", "version", "report", "history"],
+        "show_commands": ["show"], "list_commands": ["report", "history"], "list_kinds": {},
+        "validate_commands": ["validate"], "export_commands": ["export"], "diff_commands": ["diff", "claims compare"],
+        "limitations": ["GalleyPack never modifies source artifacts or interprets review completion as approval.", "The 0.1.x core emits portable manifest records; archive/container formats remain optional adapters."]
+    }
+}

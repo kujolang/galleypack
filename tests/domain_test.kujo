@@ -1,0 +1,15 @@
+from src.core import dispatch
+from src.args import parse_args
+mut passed:=0;mut failed:=0
+func check(ok,label){if ok{passed=passed+1}else{failed=failed+1;eprint("FAIL: "+label)}}
+func opts(v){return parse_args(v,["json","dry-run","force"])}
+root:="/tmp/galleypack-domain-"+uuid_v4();one:=root+"-v1.bin";two:=root+"-v2.bin";write_file(one,"version one",true);write_file(two,"version two",true)
+package:=root+"-package.json";write_file(package,"{\"schema_version\":\"1.0.0\",\"package_id\":\"package-demo\",\"package_version\":\"1\",\"artifact_ids\":[\"artifact-demo\"]}",true)
+check(!dispatch("freeze",opts(["--state",root,"--input",package,"--actor","producer"]))["ok"],"freeze requires exact artifact")
+first:=dispatch("freeze",opts(["--state",root,"--input",package,"--path",one,"--actor","producer","--id","package-demo-v1","--timestamp","2026-08-14T04:10:00Z"]));check(first["ok"],"freeze exact version")
+write_file(package,"{\"schema_version\":\"1.0.0\",\"package_id\":\"package-demo\",\"package_version\":\"2\",\"artifact_ids\":[\"artifact-demo\"]}",true)
+second:=dispatch("freeze",opts(["--state",root,"--input",package,"--path",two,"--actor","producer","--id","package-demo-v2","--timestamp","2026-08-14T04:10:01Z"]));check(second["ok"],"freeze second version")
+comparison:=dispatch("diff",opts(["--state",root,"--id","package-demo-v1","--other-id","package-demo-v2"]));check(comparison["ok"]&&!comparison["value"]["artifact_equal"],"package diff detects artifact change")
+append_file(one,"x");check(!dispatch("validate",opts(["--state",root,"--id","package-demo-v1"]))["ok"],"post-freeze drift fails")
+for path in [one,two,package]{if file_exists(path){delete_file(path)}}
+print(to_string(passed)+" passed; "+to_string(failed)+" failed");if failed>0{exit(1)}
