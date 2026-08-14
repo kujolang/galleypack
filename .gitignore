@@ -1,0 +1,3 @@
+.galleypack/
+*.tmp-*
+.env

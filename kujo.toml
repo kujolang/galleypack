@@ -1,0 +1,4 @@
+[package]
+name = "galleypack"
+version = "0.1.0"
+entry = "galleypack.kujo"
