@@ -10,16 +10,18 @@ lineage, evidence, reviews, and package versions to exact SHA-256 checksums. It
 replaces mutable “latest” folders with deterministic records that independent
 operators can compare and verify offline.
 
-## Readiness posture
+## Production capabilities
 
 GalleyPack is ready for serious local package-control workflows: immutable
 records, atomic writes, per-record locks, bounded files and queries, exact
-artifact hashes, deterministic version comparison, and fail-closed drift
-validation. It does not modify source artifacts, average away missing reviews,
-interpret review as approval, or publish.
+artifact hashes, declarative review-tree materialization, signed tree manifests,
+bounded streaming hashes, reproducible archive adapter contracts,
+credential-free object-store conformance, deterministic and semantic claim
+deltas, and fail-closed drift validation. It does not modify source artifacts,
+average away missing reviews, interpret review as approval, or publish.
 
-See the [production review](docs/PRODUCTION_READINESS_REVIEW.md) and
-[next-session worklist](docs/NEXT_SESSION.md).
+See the [production review](docs/PRODUCTION_READINESS_REVIEW.md) and completed
+[hardening worklist](docs/NEXT_SESSION.md).
 
 ## Quick install
 
