@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Enforced safe relationship/package references, non-self relationships, bounded artifact sets, state compatibility, managed-directory safety, and stricter immutable-record validation.
 - Added modular runtime architecture, strict package contracts, checksum drift validation, and deterministic version comparison.
 - Added atomic storage/export, per-record locks, bounded pagination, configuration, structured errors, and adversarial security tests.
 - Added pinned-runtime CI, production-readiness documentation, and a future enhancement worklist.
