@@ -1,9 +1,9 @@
 # GalleyPack
 
 [![Version](https://img.shields.io/badge/version-0.2.0-black)](VERSION)
-[![CI](https://github.com/kujolang/galleypack/actions/workflows/validate.yml/badge.svg)](https://github.com/kujolang/galleypack/actions/workflows/validate.yml)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 [![built with Kujo](https://img.shields.io/badge/built%20with-Kujo-white.svg)](https://github.com/kujolang/kujo)
+[![CI](https://github.com/kujolang/galleypack/actions/workflows/validate.yml/badge.svg)](https://github.com/kujolang/galleypack/actions/workflows/validate.yml)
 
 GalleyPack is a Kujo-native production packager that binds editorial artifacts,
 lineage, evidence, reviews, and package versions to exact SHA-256 checksums. It
