@@ -1,0 +1,1 @@
+{"schema_version":"1.0.0","id":"fixture-object-store","offline_fixture":true,"implicit_credentials":false,"operations":["put","head","get"]}
