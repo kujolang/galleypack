@@ -1,3 +1,6 @@
+**Runtime update:** Kujo 1.5.0 adoption and remaining local improvements are recorded
+in [the release follow-up](kujo-1.5-adoption.md). Earlier pins below are historical.
+
 # GalleyPack repository hardening — 2026-09-22
 
 **Follow-up:** GP-13 and GP-14 were subsequently implemented at the user's request.

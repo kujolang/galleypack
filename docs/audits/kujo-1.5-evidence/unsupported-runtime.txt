@@ -1,0 +1,8 @@
+{
+  "contract_version": "1.0.0",
+  "data": null,
+  "error": "Error { line: 0, message: Undefined variable: sha256_file_beneath, stack: [] }",
+  "error_code": "operation_failed",
+  "ok": false,
+  "tool_version": "0.2.0"
+}

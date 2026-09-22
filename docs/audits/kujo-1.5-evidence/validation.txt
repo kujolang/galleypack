@@ -1,0 +1,16 @@
+check passed: galleypack.kujo
+14 passed; 0 failed
+9 passed; 0 failed
+8 passed; 0 failed
+5 passed; 0 failed
+10 passed; 0 failed
+Tree hashing passed: stable binary/Unicode/empty receipts, unsafe paths, links, FIFO and byte bounds
+GalleyPack: missing value for --unknown
+11 passed; 0 failed
+16 bounds and compatibility assertions passed
+{"fixture_entries":5000,"pages":3,"peak_buffered_entries":1001,"records":2500}
+Directory paging passed: 5000 entries, <=1001 buffered names, complete cursor traversal and bounded recovery
+24 same-ID writers: one winner; 24 distinct-ID writers: all committed; no pending intents/markers
+13 CLI contract assertions passed
+Recovery passed: six SIGKILL boundaries, legacy repair, replay, conflicts, previews and lock exclusion
+GalleyPack validation passed.

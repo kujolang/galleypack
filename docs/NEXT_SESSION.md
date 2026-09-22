@@ -16,3 +16,6 @@ implementations. See [contracts](contracts.md) and the
 The [directory/recovery follow-up](audits/directory-and-recovery.md) closes the two
 original open storage findings. Use the updated runtime pin and `recover --dry-run`
 before repairing interrupted state; see [operator guide](recovery.md).
+
+Kujo 1.5.0 adoption, confined tree hashing and native byte counting are recorded in
+[audit update](audits/kujo-1.5-adoption.md). No repository-local audit item remains open.

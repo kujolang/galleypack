@@ -1,0 +1,20 @@
+func previous_size(text) {
+    encoded := encode_base64(text)
+    count := to_int(len(encoded) / 4) * 3
+    if ends_with(encoded, "==") { return count - 2 }
+    if ends_with(encoded, "=") { return count - 1 }
+    return count
+}
+mut text := "é"; for index in range(19) { text = text + text }
+mut previous := []; mut native := []
+for sample in range(5) {
+    start := performance_now(); mut size := 0
+    for iteration in range(20) { size = previous_size(text) }
+    previous = push(previous, performance_now() - start)
+    assert(size == 1048576, "previous byte count")
+    start = performance_now()
+    for iteration in range(20) { size = byte_length(text) }
+    native = push(native, performance_now() - start)
+    assert(size == 1048576, "native byte count")
+}
+print(to_json({"input_bytes":1048576,"iterations_per_sample":20,"previous_ms":previous,"native_ms":native,"equivalent":true,"eliminated_base64_bytes_per_call":1398104}))
