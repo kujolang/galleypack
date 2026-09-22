@@ -89,12 +89,24 @@ export func utf8_size(text) {
     return count
 }
 
-// lstat rejects missing paths in Kujo 1.0.1. Check directory entries to distinguish
-// an absent leaf from a dangling link without swallowing metadata/permission errors.
+// Preserve lstat errors while detecting absent/dangling leaves with bounded memory.
 export func is_symlink(path) {
     if file_exists(path) { return path_is_symlink(path) }
     parent := dirname(path)
     if !path_is_dir(parent) { return false }
-    if has(list_dir(parent), basename(path)) { return path_is_symlink(path) }
-    return false
+    name := basename(path); mut after := ""
+    while true {
+        page := list_dir_page(parent, after, 100, name)
+        for candidate in page["entries"] {
+            if candidate == name { return path_is_symlink(path) }
+            if candidate > name { return false }
+        }
+        if !page["truncated"] { return false }
+        after = page["next_after"]
+    }
+}
+
+export func require_storage_runtime() {
+    // Name resolution is deliberate: old runtimes fail before creating state.
+    assert(type(list_dir_page) == "function" && type(file_lock) == "function" && type(publish_file_noreplace) == "function", "GalleyPack requires Kujo revision cf785c0 or newer")
 }

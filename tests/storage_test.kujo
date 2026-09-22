@@ -18,13 +18,13 @@ delete_file(event_path)
 check(save_new(root, record)["ok"], "clean retry persists record and audit event")
 
 
-// A dangling event entry forces failure after record publication: rollback must work.
+// A dangling event is rejected before intent or record publication.
 record["id"] = "record-rollback"
 rollback_event := root + "/history/" + substring(sha256(record["created_at"] + "\n" + record["id"]), 0, 32) + ".json"
 linked := spawn_process(["ln", "-s", root + "/missing", rollback_event], {"timeout_ms":5000,"max_output_bytes":4096})
 check(linked.exitcode == 0, "rollback fixture created")
 rolled_back := save_new(root, record)
-check(!rolled_back["ok"] && rolled_back["code"] == "history_write_failed", "late history failure is explicit")
+check(!rolled_back["ok"] && rolled_back["code"] == "history_conflict", "dangling history conflict is explicit")
 check(!file_exists(root + "/records/record-rollback.json"), "late history failure rolls back record")
 check(len(list_dir(root + "/locks")) == 0, "late history failure releases lock")
 

@@ -14,20 +14,33 @@ CWD; use absolute artifact paths when validating from different directories.
 Inputs and stored records are limited to 1 MiB **UTF-8 bytes**, core artifacts to
 64 MiB, and rendered exports to 8 MiB. Listing parses at most 1,000 candidate
 records and retains at most 4 MiB of source record text per page. Continue with
-`next_after` while `truncated` is true. Directory-name enumeration is still eager
-in the minimum supported runtime. `doctor` and whole-state `validate` fail with
-`inspection_incomplete` when they cannot inspect the entire state in one page.
+`next_after` while `truncated` is true. Native directory paging retains at most
+1,001 candidate filenames instead of allocating/sorting the entire directory.
+It still scans the directory (O(N) work per page); pages are not filesystem snapshots.
+`doctor` and whole-state `validate` never certify a truncated inspection and check
+creation events against exact record bytes.
 
-New records, history events, metadata, and lock files use atomic no-replace
-publication. Cooperating duplicate writers cannot overwrite evidence. Existing
-legacy lock directories still block writes. A crash can leave a lock or a record
-without its history event because the two files are separate commits. Stop all
-writers, inspect the record/event checksums, and reconcile manually before
-removing a stale lock; the tool never guesses that a lock is stale. Ordinary
-history-write failure attempts record rollback and reports incomplete rollback.
+A durable transaction intent precedes immutable record and history publication.
+Publication receipts must confirm file identity and directory synchronization.
+Interrupted transactions retain their intent, and reads refuse pending records.
+`recover` replays exact bytes without replacing conflicting evidence; ordinary I/O
+failure retains redo information instead of attempting destructive rollback.
+Process-owned per-ID locks are released by the OS after process death. Persistent
+`writer-locks` files are stable lock inodes, not evidence of a live/stale writer;
+never unlink them while any process might use the state. Compatibility markers in
+`locks` keep legacy cooperating writers out until the transaction finishes.
+Recognized protocol markers can be cleared safely under the process lock; unknown
+legacy locks require the operator to stop old writers and opt in with `recover --force`.
+See [recovery](recovery.md) for migration, replay and conflict handling.
 
-`--force` authorizes replacement of an explicitly named export only; it does not
-bypass symlink checks or record immutability. JSON payload secret-shaped keys are
+Durability depends on the OS/filesystem honoring file and directory sync and
+atomic hard-link publication. Unsupported sync or publication fails explicitly.
+SIGKILL recovery is tested; hardware power interruption is not emulated. This is
+not protection against arbitrary disk corruption or operator state tampering.
+
+`--force` authorizes explicit export replacement or removal of legacy record locks
+during recovery; it never authorizes record/event replacement or symlink traversal.
+JSON payload secret-shaped keys are
 rejected; this is not a content DLP scanner. Do not put secrets in artifact text,
 metadata, actor fields or optional adapter receipts. HMAC keys are caller-owned
 library arguments and are not persisted by the signing helper.

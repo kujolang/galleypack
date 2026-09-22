@@ -1,0 +1,80 @@
+from src.storage import initialize, save_new, load_record, list_records, recover
+from src.transactions import writer_lock, prepare_record, journal_path, event_path
+from src.common import get
+from src.core import dispatch
+from src.args import parse_args
+from tests.support import cleanup
+runtime := args()[0]
+root := "/tmp/galleypack-recovery-" + uuid_v4(); create_dir(root)
+metadata := {"tool":"galleypack","contract_version":"1.0.0"}
+for boundary in ["locked","staged","intent","record","event","complete"] {
+    state := root + "/" + boundary; assert(initialize(state,metadata)["ok"],"initialize crash state")
+    crashed := spawn_process([runtime,"run","tests/crash_worker.kujo","--",state,boundary],{"timeout_ms":15000,"max_output_bytes":4096})
+    assert(crashed.exitcode != 0,"worker killed at " + boundary)
+    pending := boundary == "intent" || boundary == "record" || boundary == "event"
+    if pending {
+        assert(len(list_records(state,"","",100)["warnings"]) > 0,"pending intent visible even without record")
+        assert(load_record(state,"artifact-crash")["code"] == "recovery_required","partial record is not readable")
+    }
+    before := to_json(sort(list_dir(state + "/transactions")))
+    preview := recover(state,"","",100,true,false)
+    assert(preview["ok"] && to_json(sort(list_dir(state + "/transactions"))) == before,"preview does not mutate")
+    fixed := recover(state,"","",100,false,false); assert(fixed["ok"],"recover after " + boundary + ": " + to_json(fixed))
+    assert(len(list_dir(state + "/transactions")) == 0 && len(list_dir(state + "/locks")) == 0,"intent/stage and protocol marker cleared")
+    if boundary == "locked" || boundary == "staged" {
+        assert(!load_record(state,"artifact-crash")["ok"],"uncommitted stage is discarded")
+        assert(save_new(state,{"id":"artifact-crash","actor":"test","created_at":"2026-09-22T00:00:00Z","payload":{"boundary":boundary}})["ok"],"aborted ID remains available")
+    }
+    loaded := load_record(state,"artifact-crash"); assert(loaded["ok"],"record recovered")
+    events := list_dir(state + "/history"); assert(len(events) == 1,"one event after replay")
+    assert(parse_json(read_file(state + "/history/" + events[0]))["record_sha256"] == loaded["checksum"],"exact checksum preserved")
+    assert(recover(state,"","",100,false,false)["ok"] && len(list_dir(state + "/history")) == 1,"repeat recovery is idempotent")
+}
+state := root + "/legacy"; initialize(state,metadata)
+record := {"id":"artifact-legacy","actor":"test","created_at":"2026-09-22T00:00:00Z"}; text := to_json_pretty(record) + "\n"
+write_file(state + "/records/" + record["id"] + ".json",text,true)
+create_dir(state + "/locks/" + record["id"] + ".lock")
+assert(!recover(state,record["id"],"",100,false,false)["ok"],"legacy locks require explicit maintenance override")
+doctor := dispatch("doctor",parse_args(["--state",state],[]))
+assert(!doctor["ok"],"doctor detects legacy orphan history")
+assert(recover(state,record["id"],"",100,true,true)["ok"] && len(list_dir(state + "/history")) == 0,"legacy preview remains read-only")
+assert(recover(state,record["id"],"",100,false,true)["ok"],"repair legacy orphan and empty directory lock")
+assert(len(list_dir(state + "/locks")) == 0 && len(list_dir(state + "/history")) == 1,"legacy recovery complete")
+handle := writer_lock(state,record["id"])
+assert(!recover(state,record["id"],"",100,false,false)["ok"],"recovery cannot race a live writer")
+file_unlock(handle)
+// Durable intent is authoritative, but conflicting evidence is never replaced.
+record["id"] = "artifact-conflict"; text = to_json_pretty(record) + "\n"
+prepare_record(state,record,text)
+write_file(state + "/records/artifact-conflict.json","conflicting evidence",true)
+assert(!recover(state,record["id"],"",100,false,false)["ok"],"conflicting record fails closed")
+assert(read_file(state + "/records/artifact-conflict.json") == "conflicting evidence" && file_exists(journal_path(state,record["id"])),"conflict preserves record and journal")
+record["id"] = "artifact-retry"; text = to_json_pretty(record) + "\n"; prepare_record(state,record,text)
+assert(save_new(state,record)["ok"],"identical retry automatically replays pending intent")
+record["id"] = "artifact-other"; text = to_json_pretty(record) + "\n"; prepare_record(state,record,text)
+record["actor"] = "other"
+assert(save_new(state,record)["code"] == "recovery_conflict","different retry cannot replace intent")
+// An I/O failure after record publication keeps intent and excludes legacy writers.
+record["id"] = "artifact-io-failure"
+stage := event_path(state,record) + ".stage"; create_dir(stage)
+failed := save_new(state,record)
+assert(!failed["ok"] && failed["code"] == "recovery_required" && file_exists(journal_path(state,record["id"])),"late I/O failure retains redo evidence")
+assert(file_exists(state + "/locks/" + record["id"] + ".lock") && load_record(state,record["id"])["code"] == "recovery_required","incomplete record is hidden and old writers excluded")
+os_rmdir(stage)
+assert(recover(state,record["id"],"",100,false,false)["ok"],"retry after I/O repair finishes transaction")
+write_file(journal_path(state,"artifact-malformed"),"{",true)
+assert(!recover(state,"artifact-malformed","",100,false,false)["ok"],"malformed intent fails closed")
+assert(recover(root + "/absent","","",100,true,false)["ok"] && !file_exists(root + "/absent"),"absent-state preview creates nothing")
+record["id"] = "artifact-history-link"; text = to_json_pretty(record) + "\n"
+prepare_record(state,record,text)
+outside := root + "/outside"; write_file(outside,"outside evidence",true)
+assert(spawn_process(["ln","-s",outside,event_path(state,record)],{"timeout_ms":5000,"max_output_bytes":4096}).exitcode == 0,"history symlink fixture")
+assert(!recover(state,record["id"],"",100,false,false)["ok"] && read_file(outside) == "outside evidence","recovery does not follow event symlinks")
+write_file(journal_path(state,"artifact-checksum"),to_json({"schema_version":"1.0.0","record_text":text,"record_sha256":"wrong"}),true)
+assert(!recover(state,"artifact-checksum","",100,false,false)["ok"],"journal checksum mismatch is rejected")
+write_file(state + "/records/zz bad.json","{}",true)
+unsafe_page := recover(state,"","zy",1,true,false)
+assert(!unsafe_page["ok"] && unsafe_page["value"]["next_after"] == "zz bad","unsafe name is reported")
+assert(recover(state,"",unsafe_page["value"]["next_after"],1,true,false)["ok"],"unsafe names still permit cursor continuation")
+cleanup(root)
+print("Recovery passed: six SIGKILL boundaries, legacy repair, replay, conflicts, previews and lock exclusion")

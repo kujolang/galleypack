@@ -1,6 +1,7 @@
 from src.storage import save_new
 root := args()[0]; index := args()[1]
 record := {"id":"artifact-contended", "actor":"writer-" + index, "created_at":"2026-09-22T00:00:00Z", "payload":{"writer":index}}
+if len(args()) > 2 { record["id"] = "artifact-distinct-" + index }
 mut result := {}
 try { result = save_new(root, record) } except error { result = {"ok":false,"code":"unexpected","error":to_string(error)} }
 print(to_json(result))

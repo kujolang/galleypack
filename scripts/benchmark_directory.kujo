@@ -1,0 +1,8 @@
+// Opt-in comparison of the old enumeration and bounded native page on one fixture.
+// The baseline intentionally allocates every name; do not point it at unbounded input.
+if len(args()) != 1 { eprint("usage: kujo run scripts/benchmark_directory.kujo -- FIXTURE_DIRECTORY"); exit(2) }
+root := args()[0]
+start := performance_now(); before := sort(list_dir(root)); before_ms := performance_now() - start
+start = performance_now(); after := list_dir_page(root,"",1000,""); after_ms := performance_now() - start
+assert(to_json(after["entries"]) == to_json(slice(before,0,1000)),"directory page preserves exact filename order")
+print(to_json({"entries":len(before),"before_retained_names":len(before),"after_peak_retained_names":after["buffered_entries"],"before_ms":before_ms,"after_ms":after_ms,"same_page":true}))

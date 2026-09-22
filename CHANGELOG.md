@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added bounded native directory pages and corrected continuation for prefix-related IDs.
+- Added durable write intents, per-ID OS locks, idempotent `recover`/dry-run, legacy
+  orphan repair and crash-injection gates; conflicting evidence is never overwritten.
+- Doctor and validation now detect creation-event inconsistency. Runtime prerequisite
+  advances to the CI-pinned Kujo 1.4.0 build with required filesystem primitives.
+
 - Made record locks and immutable record/event publication exclusive under contention.
 - Made dry runs side-effect free; validate CLI/config shapes and calendar dates.
 - Bound filtered/corrupt record scans and retained page bytes with continuation cursors;

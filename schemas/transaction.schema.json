@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GalleyPack durable transaction intent",
+  "type": "object",
+  "required": ["schema_version", "record_text", "record_sha256"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "record_text": {
+      "type": "string",
+      "maxLength": 1048576,
+      "$comment": "Runtime additionally enforces 1 MiB UTF-8 bytes and validates the embedded record identity."
+    },
+    "record_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "$comment": "The journal file is capped at 2162688 UTF-8 bytes. Paths are derived from the validated embedded record, not supplied here."
+}

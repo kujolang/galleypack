@@ -1,0 +1,110 @@
+// Internal transaction protocol. Callers hold writer_lock for every mutation.
+from src.common import get, safe_id, parse_object, utf8_size, is_symlink
+
+export func journal_dir(state) { return join_path(state, "transactions") }
+export func journal_path(state, id) { return join_path(journal_dir(state), id + ".json") }
+export func writer_locks_dir(state) { return join_path(state,"writer-locks") }
+export func writer_lock(state, id) {
+    if !safe_id(id) { throw("unsafe writer lock ID") }
+    return file_lock(join_path(writer_locks_dir(state),id + ".lock"),0)
+}
+// Keep the legacy no-replace sentinel so older cooperating writers cannot race us.
+export func owned_marker(path) {
+    return path_is_file(path) && !is_symlink(path) && file_size(path) == 22 && read_file(path) == "galleypack-journal-v1\n"
+}
+export func reserve_marker(path) {
+    if owned_marker(path) { return true }
+    write_file_atomic(path,"galleypack-journal-v1\n",false)
+    return true
+}
+export func event_path(state, record) { return join_path(join_path(state, "history"), substring(sha256(record["created_at"] + "\n" + record["id"]), 0, 32) + ".json") }
+export func event_text(record, text) {
+    return to_json_pretty({"schema_version":"1.0.0", "event":"record.created", "record_id":record["id"], "actor":record["actor"], "at":record["created_at"], "record_sha256":sha256(text)}) + "\n"
+}
+
+func checked_publication(stage, path) {
+    receipt := publish_file_noreplace(stage, path)
+    if !receipt["verified"] || !receipt["destination_directory_synced"] || !receipt["source_directory_synced"] { throw("publication durability could not be confirmed: " + path) }
+}
+
+// Kujo has no standalone directory fsync: a checked publication supplies the barrier.
+export func sync_directory(dir) {
+    dir = path_absolute(dir)
+    stage := join_path(dir, ".galleypack-sync-" + uuid_v4() + ".stage")
+    target := stage + ".barrier"
+    write_file_atomic(stage, "sync\n", false)
+    checked_publication(stage, target)
+    delete_file(target)
+}
+
+export func durable_create(path, text) {
+    if is_symlink(path) { throw("refusing symlink publication: " + path) }
+    if file_exists(path) {
+        if !path_is_file(path) || file_size(path) > 2162688 || read_file(path) != text { throw("immutable publication conflict: " + path) }
+        // A previous process may have died after linking but before syncing the directory.
+        sync_directory(dirname(path))
+        return true
+    }
+    stage := path + ".stage"
+    if is_symlink(stage) || (file_exists(stage) && !path_is_file(stage)) { throw("unsafe transaction staging path: " + stage) }
+    write_file_atomic(stage, text, true)
+    checked_publication(stage, path)
+    return true
+}
+
+export func read_bounded(path, maximum) {
+    if is_symlink(path) || !path_is_file(path) { throw("expected a regular non-symlink file: " + path) }
+    if file_size(path) > maximum { throw("file exceeds recovery byte limit: " + path) }
+    return read_file(path)
+}
+
+export func decode_record(text, id) {
+    if utf8_size(text) > 1048576 { throw("record exceeds 1 MiB") }
+    parsed := parse_object(text, "transaction record")
+    if !parsed["ok"] { throw(parsed["error"]) }
+    record := parsed["value"]
+    if !safe_id(id) || get(record, "id", "") != id || type(get(record,"actor",null)) != "string" || type(get(record,"created_at",null)) != "string" { throw("invalid transaction record identity") }
+    return record
+}
+
+export func prepare_record(state, record, text) {
+    decode_record(text, record["id"])
+    journal := to_json_pretty({"schema_version":"1.0.0", "record_text":text, "record_sha256":sha256(text)}) + "\n"
+    durable_create(journal_path(state, record["id"]), journal)
+}
+
+export func read_prepared(state, id) {
+    parsed := parse_object(read_bounded(journal_path(state, id), 2162688), "transaction journal")
+    if !parsed["ok"] { throw(parsed["error"]) }
+    journal := parsed["value"]; text := get(journal, "record_text", null)
+    if get(journal,"schema_version","") != "1.0.0" || type(text) != "string" || sha256(text) != get(journal,"record_sha256","") { throw("invalid transaction journal or checksum") }
+    return {"record":decode_record(text, id), "text":text}
+}
+
+export func publish_record(state, record, text) { durable_create(join_path(join_path(state,"records"),record["id"] + ".json"), text) }
+export func publish_event(state, record, text) { durable_create(event_path(state,record), event_text(record,text)) }
+export func complete_record(state, id) {
+    prepared := read_prepared(state,id); record := prepared["record"]
+    for path in [join_path(join_path(state,"records"),id + ".json"),event_path(state,record),journal_path(state,id)] {
+        stage := path + ".stage"
+        if file_exists(stage) || is_symlink(stage) {
+            if read_bounded(stage,2162688) != read_bounded(path,2162688) { throw("conflicting transaction stage: " + stage) }
+            delete_file(stage)
+        }
+    }
+    delete_file(journal_path(state,id))
+}
+
+export func pending_record(state, id) {
+    path := journal_path(state,id)
+    return file_exists(path) || is_symlink(path)
+}
+
+// Intent publication precedes both data files; replay is immutable and idempotent.
+export func replay_record(state, id) {
+    prepared := read_prepared(state,id); record := prepared["record"]; text := prepared["text"]
+    publish_record(state,record,text)
+    publish_event(state,record,text)
+    complete_record(state,id)
+    return {"path":join_path(join_path(state,"records"),id + ".json"),"checksum":sha256(text),"recovered":true}
+}

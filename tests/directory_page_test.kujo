@@ -1,0 +1,31 @@
+from src.storage import initialize, list_records, recover
+from tests.support import cleanup
+root := "/tmp/galleypack-pages-" + uuid_v4()
+assert(initialize(root,{"tool":"galleypack","contract_version":"1.0.0"})["ok"],"initialize paging state")
+for index in range(2500) {
+    id := "record-" + to_string(10000 + index)
+    write_file(root + "/records/" + id + ".json",to_json({"id":id,"actor":"test","created_at":"2026-09-22T00:00:00Z"}),true)
+    write_file(root + "/records/ignore-" + to_string(index) + ".txt","ignored",true)
+}
+mut cursor := ""; mut count := 0; mut seen := {}; mut peak := 0; mut pages := 0
+while true {
+    page := list_records(root,"",cursor,1000)
+    pages = pages + 1; if page["directory_entries_buffered"] > peak { peak = page["directory_entries_buffered"] }
+    assert(page["directory_entries_buffered"] <= 1001 && page["directory_entries_examined"] == 5000,"bounded native filename buffer including unrelated files")
+    for record in page["records"] { assert(has_key(seen,record["id"]) == 0,"no repeated record"); seen[record["id"]] = true; count = count + 1 }
+    if !page["truncated"] { break }
+    assert(page["next_after"] != cursor,"cursor advances"); cursor = page["next_after"]
+}
+assert(count == 2500,"all records reachable")
+print(to_json({"fixture_entries":5000,"records":count,"pages":pages,"peak_buffered_entries":peak}))
+recovery := recover(root,"","",7,true,false)
+assert(recovery["ok"] && recovery["value"]["truncated"] && len(recovery["value"]["results"]) == 7 && recovery["value"]["directory_entries_buffered"] <= 36,"bounded recovery planning")
+cleanup(root)
+initialize(root,{"tool":"galleypack","contract_version":"1.0.0"})
+for id in ["artifact-abc","artifact-abc-child","artifact-abd"] { write_file(root + "/records/" + id + ".json",to_json({"id":id}),true) }
+first := list_records(root,"","",1)
+second := list_records(root,"",first["next_after"],1)
+third := list_records(root,"",second["next_after"],1)
+assert(first["records"][0]["id"] == "artifact-abc-child" && second["records"][0]["id"] == "artifact-abc" && third["records"][0]["id"] == "artifact-abd" && !third["truncated"],"filename-stem cursors handle prefix IDs without repeating/skipping")
+cleanup(root)
+print("Directory paging passed: 5000 entries, <=1001 buffered names, complete cursor traversal and bounded recovery")

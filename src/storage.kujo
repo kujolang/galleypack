@@ -1,4 +1,5 @@
-from src.common import get, parse_object, safe_id, utf8_size, is_symlink
+from src.transactions import journal_dir, journal_path, writer_lock, writer_locks_dir, event_path, event_text, sync_directory, prepare_record, publish_record, publish_event, complete_record, pending_record, replay_record, read_prepared, read_bounded, decode_record, owned_marker, reserve_marker
+from src.common import get, parse_object, safe_id, utf8_size, is_symlink, require_storage_runtime
 
 func ensure_tree(path) {
     if path == "" || path == "." { return "" }
@@ -9,7 +10,7 @@ func ensure_tree(path) {
             if current == "/" { current = "/" + part } else if current == "" { current = part } else { current = current + "/" + part }
             if file_exists(current) {
                 if !path_is_dir(current) { return "path component is not a directory: " + current }
-            } else { try { create_dir(current) } except error { return "could not create directory: " + current } }
+            } else { try { create_dir(current); sync_directory(dirname(current)) } except error { return "could not create directory: " + current } }
         }
     }
     return ""
@@ -30,7 +31,7 @@ export func record_path(state, id) { return join_path(records_dir(state), id + "
 
 export func inspect_state(state, metadata) {
     error := validate_state_path(state); if error != "" { return {"ok": false, "code": "unsafe_state", "error": error} }
-    for dir in [records_dir(state), history_dir(state), locks_dir(state)] {
+    for dir in [records_dir(state), history_dir(state), locks_dir(state), journal_dir(state), writer_locks_dir(state)] {
         if is_symlink(dir) || (file_exists(dir) && !path_is_dir(dir)) { return {"ok": false, "code": "unsafe_state", "error": "managed state paths must be regular directories"} }
     }
     path := join_path(state, "metadata.json")
@@ -46,11 +47,16 @@ export func inspect_state(state, metadata) {
 }
 
 export func initialize(state, metadata) {
+    require_storage_runtime()
     checked := inspect_state(state, metadata); if !checked["ok"] { return checked }
-    for dir in [records_dir(state), history_dir(state), locks_dir(state)] {
+    for dir in [records_dir(state), history_dir(state), locks_dir(state), journal_dir(state), writer_locks_dir(state)] {
         error := ensure_tree(dir); if error != "" { return {"ok": false, "code": "unsafe_state", "error": error} }
     }
     path := join_path(state, "metadata.json")
+    try {
+        sync_directory(state)
+        if !file_exists(path) { sync_directory(dirname(path_absolute(state))) }
+    } except error { return {"ok":false,"code":"write_failed","error":"state directory durability could not be confirmed: " + to_string(error)} }
     if !file_exists(path) {
         try { write_file_atomic(path, to_json_pretty(metadata) + "\n", false) } except error {
             // A concurrent initializer may win; inspect once, without recursive retries.
@@ -63,59 +69,59 @@ export func initialize(state, metadata) {
 
 func lock_path(state, id) { return join_path(locks_dir(state), id + ".lock") }
 
-func acquire_lock(state, id) {
-    path := lock_path(state, id)
-    try { write_file_atomic(path, "locked\n", false) } except error { return {"ok": false, "code": "write_conflict", "error": "could not acquire record lock: " + id} }
-    return {"ok": true, "path": path}
-}
-
-func release_lock(path) { delete_file(path) }
-
 func save_locked(state, record) {
-    id := record["id"]
-    if !safe_id(id) { return {"ok": false, "code": "unsafe_id", "error": "unsafe record id"} }
-    path := record_path(state, id)
-    if path_is_file(path) { return {"ok": false, "code": "duplicate_id", "error": "record already exists: " + id} }
-    if is_symlink(path) { return {"ok": false, "code": "symlink_escape", "error": "record symlinks are not allowed"} }
+    id := record["id"]; path := record_path(state,id)
+    try { reserve_marker(lock_path(state,id)) } except error { return {"ok":false,"code":"write_conflict","error":"record lock exists; recover legacy locks only after stopping legacy writers"} }
     serialized := to_json_pretty(record) + "\n"
-    if utf8_size(serialized) > 1048576 { return {"ok": false, "code": "record_too_large", "error": "serialized record exceeds 1 MiB"} }
-    checksum := sha256(serialized)
-    event := {"schema_version": "1.0.0", "event": "record.created", "record_id": id, "actor": record["actor"], "at": record["created_at"], "record_sha256": checksum}
-    event_path := join_path(history_dir(state), substring(sha256(record["created_at"] + "\n" + id), 0, 32) + ".json")
-    if file_exists(event_path) { return {"ok": false, "code": "history_conflict", "error": "audit history event already exists"} }
-    try { write_file_atomic(path, serialized, false) } except error { return {"ok": false, "code": "write_failed", "error": "atomic record write failed"} }
-    try { write_file_atomic(event_path, to_json_pretty(event) + "\n", false) } except error {
-        try { delete_file(path) } except rollback_error {}
-        if path_is_file(path) { return {"ok": false, "code": "history_write_failed", "error": "audit history write failed and record rollback was incomplete"} }
-        return {"ok": false, "code": "history_write_failed", "error": "audit history write failed; record write was rolled back"}
+    if utf8_size(serialized) > 1048576 { return {"ok":false,"code":"record_too_large","error":"serialized record exceeds 1 MiB"} }
+    if pending_record(state,id) {
+        prepared := read_prepared(state,id)
+        if prepared["text"] != serialized { return {"ok":false,"code":"recovery_conflict","error":"pending intent belongs to different record bytes"} }
+        return {"ok":true,"value":replay_record(state,id)}
     }
-    return {"ok": true, "value": {"path": path, "checksum": checksum}}
+    if file_exists(path) { return {"ok":false,"code":"duplicate_id","error":"record already exists: " + id} }
+    if is_symlink(path) { return {"ok":false,"code":"symlink_escape","error":"record symlinks are not allowed"} }
+    event := event_path(state,record)
+    if file_exists(event) || is_symlink(event) { return {"ok":false,"code":"history_conflict","error":"audit history event already exists"} }
+    prepare_record(state,record,serialized)
+    publish_record(state,record,serialized)
+    publish_event(state,record,serialized)
+    complete_record(state,id)
+    return {"ok":true,"value":{"path":path,"checksum":sha256(serialized)}}
 }
 
 export func save_new(state, record) {
-    if type(record) != "dict" || !safe_id(get(record, "id", "")) { return {"ok": false, "code": "unsafe_id", "error": "unsafe record id"} }
-    if type(get(record, "actor", null)) != "string" || type(get(record, "created_at", null)) != "string" { return {"ok": false, "code": "invalid_record", "error": "record actor and created_at must be strings"} }
-    error := validate_state_path(state); if error != "" { return {"ok": false, "code": "unsafe_state", "error": error} }
-    for dir in [records_dir(state), history_dir(state), locks_dir(state)] {
-        if !path_is_dir(dir) || is_symlink(dir) { return {"ok": false, "code": "unsafe_state", "error": "initialize regular managed state directories before writing"} }
+    require_storage_runtime()
+    if type(record) != "dict" || !safe_id(get(record,"id","")) { return {"ok":false,"code":"unsafe_id","error":"unsafe record id"} }
+    if type(get(record,"actor",null)) != "string" || type(get(record,"created_at",null)) != "string" { return {"ok":false,"code":"invalid_record","error":"record actor and created_at must be strings"} }
+    error := validate_state_path(state); if error != "" { return {"ok":false,"code":"unsafe_state","error":error} }
+    for dir in [records_dir(state), history_dir(state), locks_dir(state), journal_dir(state), writer_locks_dir(state)] {
+        if !path_is_dir(dir) || is_symlink(dir) { return {"ok":false,"code":"unsafe_state","error":"initialize regular managed state directories before writing"} }
     }
-    lock := acquire_lock(state, record["id"]); if !lock["ok"] { return lock }
+    mut handle := 0
+    try { handle = writer_lock(state,record["id"]) } except error { return {"ok":false,"code":"write_conflict","error":to_string(error)} }
     mut result := {}
-    try { result = save_locked(state, record) } except error { result = {"ok": false, "code": "write_failed", "error": to_string(error)} }
-    try { release_lock(lock["path"]) } except error {
-        return {"ok": false, "code": "lock_cleanup_failed", "error": "record operation completed but its lock could not be removed: " + to_string(error), "value": {"operation_result": result}}
-    }
+    try { result = save_locked(state,record) } except error { result = {"ok":false,"code":"recovery_required","error":"transaction interrupted; retry identical input or run recover: " + to_string(error)} }
+    try {
+        marker := lock_path(state,record["id"])
+        if owned_marker(marker) && !pending_record(state,record["id"]) { delete_file(marker) }
+    } except error { result = {"ok":false,"code":"lock_cleanup_failed","error":to_string(error),"value":{"operation_result":result}} }
+    file_unlock(handle)
     return result
 }
 
 func read_record_file(state, id, checksum_required) {
     if !safe_id(id) { return {"ok": false, "code": "unsafe_id", "error": "unsafe record id"} }
     path := record_path(state, id)
-    if !path_is_file(path) || is_symlink(path) { return {"ok": false, "code": "not_found", "error": "record not found: " + id} }
+    if !path_is_file(path) || is_symlink(path) {
+        if pending_record(state,id) { return {"ok":false,"code":"recovery_required","error":"record has a pending transaction; run recover"} }
+        return {"ok":false,"code":"not_found","error":"record not found: " + id}
+    }
     size := file_size(path)
     if size > 1048576 { return {"ok": false, "code": "record_too_large", "error": "record exceeds 1 MiB"} }
     contents := read_file(path); parsed := parse_object(contents, "record " + id); if !parsed["ok"] { return parsed }
     if get(parsed["value"], "id", "") != id { return {"ok": false, "code": "id_mismatch", "error": "record id does not match filename"} }
+    if pending_record(state,id) { return {"ok":false,"code":"recovery_required","error":"record transaction is incomplete; run recover"} }
     result := {"ok": true, "value": parsed["value"], "bytes": size}
     if checksum_required { result["checksum"] = sha256(contents) }
     return result
@@ -123,7 +129,7 @@ func read_record_file(state, id, checksum_required) {
 
 export func load_record(state, id) {
     state_error := validate_state_path(state); if state_error != "" { return {"ok": false, "code": "unsafe_state", "error": state_error} }
-    dir := records_dir(state); if file_exists(dir) && (is_symlink(dir) || !path_is_dir(dir)) { return {"ok": false, "code": "unsafe_state", "error": "records path must be a regular directory"} }
+    for dir in [records_dir(state),journal_dir(state)] { if is_symlink(dir) || (file_exists(dir) && !path_is_dir(dir)) { return {"ok":false,"code":"unsafe_state","error":"managed read paths must be regular directories"} } }
     return read_record_file(state, id, true)
 }
 
@@ -131,29 +137,138 @@ export func list_records(state, kind, after, limit) {
     mut records := []; mut warnings := []; mut truncated := false
     mut scanned := 0; mut total_bytes := 0; mut next_after := after
     state_error := validate_state_path(state)
-    if state_error != "" { return {"records": records, "warnings": [{"id": "", "code": "unsafe_state", "error": state_error}], "truncated": false, "next_after": after} }
+    for managed in [records_dir(state),journal_dir(state)] {
+        if is_symlink(managed) || (file_exists(managed) && !path_is_dir(managed)) { state_error = "managed read paths must be regular directories" }
+    }
+    if state_error != "" { return {"records":records,"warnings":[{"id":"","code":"unsafe_state","error":state_error}],"truncated":false,"next_after":after} }
+    if path_is_dir(journal_dir(state)) {
+        pending := list_dir_page(journal_dir(state),"",1,".json")
+        if len(pending["entries"]) > 0 { warnings = push(warnings,{"id":"","code":"recovery_required","error":"pending transaction intent exists; run recover"}) }
+    }
+    if path_is_dir(locks_dir(state)) && !is_symlink(locks_dir(state)) {
+        locks := list_dir_page(locks_dir(state),"",1,".lock")
+        if len(locks["entries"]) > 0 { warnings = push(warnings,{"id":"","code":"write_lock_present","error":"record lock exists; an active writer or recovery needs attention"}) }
+    }
     dir := records_dir(state)
-    if is_symlink(dir) || (file_exists(dir) && !path_is_dir(dir)) { return {"records": records, "warnings": [{"id": "", "code": "unsafe_state", "error": "records path must be a regular directory"}], "truncated": false, "next_after": after} }
-    if !path_is_dir(dir) { return {"records": records, "warnings": warnings, "truncated": false, "next_after": after} }
-    // Directory enumeration remains eager in Kujo; bound parsing, hashing and retained data.
-    for name in sort(list_dir(dir)) {
-        if ends_with(name, ".json") {
-            id := substring(name, 0, len(name) - 5)
-            if after == "" || id > after {
-                if scanned >= 1000 || len(records) >= limit { truncated = true; break }
-                loaded := read_record_file(state, id, false)
-                if loaded["ok"] {
-                    record := loaded["value"]
-                    if kind == "" || get(record, "record_type", "") == kind {
-                        if total_bytes + loaded["bytes"] > 4194304 { truncated = true; break }
-                        total_bytes = total_bytes + loaded["bytes"]
-                        records = push(records, record)
-                    }
-                } else { warnings = push(warnings, {"id": id, "code": loaded["code"], "error": loaded["error"]}) }
-                scanned = scanned + 1
-                next_after = id
+    if !path_is_dir(dir) { return {"records":records,"warnings":warnings,"truncated":false,"next_after":after} }
+    cursor := ""; if after != "" { cursor = after + ".json" }
+    page := list_dir_page(dir,cursor,1000,".json"); truncated = page["truncated"]
+    for name in page["entries"] {
+        id := substring(name,0,len(name) - 5)
+        if len(records) >= limit { truncated = true; break }
+        loaded := read_record_file(state,id,false)
+        if loaded["ok"] {
+            record := loaded["value"]
+            if kind == "" || get(record,"record_type","") == kind {
+                if total_bytes + loaded["bytes"] > 4194304 { truncated = true; break }
+                total_bytes = total_bytes + loaded["bytes"]; records = push(records,record)
             }
+        } else { warnings = push(warnings,{"id":id,"code":loaded["code"],"error":loaded["error"]}) }
+        scanned = scanned + 1; next_after = id
+    }
+    return {"records":records,"warnings":warnings,"truncated":truncated,"next_after":next_after,"scanned":scanned,"directory_entries_buffered":page["buffered_entries"],"directory_entries_examined":page["examined_entries"]}
+}
+
+func recovery_one(state, id, dry_run, force) {
+    legacy := lock_path(state,id)
+    mut locked := file_exists(legacy) || is_symlink(legacy)
+    if locked && !owned_marker(legacy) && !force { return {"ok":false,"code":"legacy_lock","error":"stop legacy writers, then recover with --force to remove their lock"} }
+    if locked && (is_symlink(legacy) || (!path_is_file(legacy) && !path_is_dir(legacy))) { return {"ok":false,"code":"unsafe_state","error":"unsafe legacy lock"} }
+    if locked && path_is_dir(legacy) && len(list_dir_page(legacy,"",1,"")["entries"]) > 0 { return {"ok":false,"code":"unsafe_state","error":"legacy lock directory is not empty"} }
+    pending := pending_record(state,id); path := record_path(state,id)
+    mut text := ""; mut record := {}; mut action := "already_consistent"
+    if pending {
+        prepared := read_prepared(state,id); text = prepared["text"]; record = prepared["record"]; action = "replay"
+    } else if file_exists(path) || is_symlink(path) {
+        text = read_bounded(path,1048576); record = decode_record(text,id)
+    }
+    if text != "" {
+        event := event_path(state,record); expected := event_text(record,text)
+        if file_exists(path) || is_symlink(path) { if read_bounded(path,1048576) != text { throw("record conflicts with journal") } }
+        if file_exists(event) || is_symlink(event) {
+            if read_bounded(event,2162688) != expected { throw("history event conflicts with record") }
+        } else if !pending { action = "repair_event" }
+        if !dry_run && action != "already_consistent" {
+            if locked && !owned_marker(legacy) {
+                if path_is_dir(legacy) { os_rmdir(legacy) } else { delete_file(legacy) }
+            }
+            reserve_marker(legacy); locked = true
+            if !pending { prepare_record(state,record,text) }
+            replay_record(state,id)
+        }
+    } else { action = "not_found" }
+    stage := journal_path(state,id) + ".stage"
+    staged := file_exists(stage) || is_symlink(stage)
+    if staged {
+        // A stage without a published intent was never accepted as a transaction.
+        read_bounded(stage,2162688)
+        if action == "not_found" { action = "discard_uncommitted_stage" }
+        if !dry_run { delete_file(stage) }
+    }
+    if locked {
+        if !dry_run { if path_is_dir(legacy) { os_rmdir(legacy) } else { delete_file(legacy) } }
+        if action == "not_found" || action == "already_consistent" { action = "remove_legacy_lock" }
+    }
+    return {"ok":true,"value":{"id":id,"action":action,"dry_run":dry_run}}
+}
+
+func recovery_page(state, after, limit) {
+    mut names := {}; mut truncated := false; mut buffered := 0
+    for spec in [[records_dir(state),".json"],[journal_dir(state),".json"],[journal_dir(state),".json.stage"],[locks_dir(state),".lock"]] {
+        dir := spec[0]; suffix := spec[1]
+        if path_is_dir(dir) {
+            cursor := ""; if after != "" { cursor = after + suffix }
+            page := list_dir_page(dir,cursor,limit + 1,suffix)
+            buffered = buffered + page["buffered_entries"]
+            if page["truncated"] { truncated = true }
+            for name in page["entries"] { id := substring(name,0,len(name) - len(suffix)); names[id + ".json"] = id }
         }
     }
-    return {"records": records, "warnings": warnings, "truncated": truncated, "next_after": next_after, "scanned": scanned}
+    ordered := sort(keys(names)); if len(ordered) > limit { truncated = true }
+    mut ids := []; for name in slice(ordered,0,limit) { ids = push(ids,names[name]) }
+    return {"ids":ids,"truncated":truncated,"directory_entries_buffered":buffered}
+}
+
+export func recover(state, id, after, limit, dry_run, force) {
+    require_storage_runtime()
+    if type(dry_run) != "bool" || type(force) != "bool" { return {"ok":false,"code":"invalid_recovery_options","error":"dry_run and force must be booleans"} }
+    if id != "" && !safe_id(id) { return {"ok":false,"code":"unsafe_id","error":"unsafe recovery id"} }
+    if type(limit) != "int" || limit < 1 || limit > 1000 { return {"ok":false,"code":"out_of_range","error":"recovery limit must be 1..1000"} }
+    if type(after) != "string" || len(after) > 255 || contains(after,"/") { return {"ok":false,"code":"unsafe_cursor","error":"recovery cursor must be a bounded filename stem"} }
+    error := validate_state_path(state); if error != "" { return {"ok":false,"code":"unsafe_state","error":error} }
+    if !path_is_dir(state) { return {"ok":true,"value":{"results":[],"truncated":false,"next_after":after,"dry_run":dry_run}} }
+    for dir in [records_dir(state),history_dir(state),locks_dir(state),journal_dir(state),writer_locks_dir(state)] {
+        if is_symlink(dir) || (file_exists(dir) && !path_is_dir(dir)) { return {"ok":false,"code":"unsafe_state","error":"unsafe recovery directory"} }
+        if !dry_run { made := ensure_tree(dir); if made != "" { return {"ok":false,"code":"unsafe_state","error":made} } }
+    }
+    mut result := {}
+    try {
+        page := {"ids":[id],"truncated":false,"directory_entries_buffered":0}
+        if id == "" { page = recovery_page(state,after,limit) }
+        mut results := []; mut failed := false; mut cursor := after
+        for candidate in page["ids"] {
+            mut item := {}; mut handle := 0
+            try {
+                if !safe_id(candidate) { throw("unsafe recovery filename") }
+                if !dry_run { handle = writer_lock(state,candidate) }
+                item = recovery_one(state,candidate,dry_run,force)
+            } except error { item = {"ok":false,"code":"recovery_conflict","error":to_string(error)} }
+            if handle != 0 { file_unlock(handle) }
+            if !item["ok"] { failed = true }
+            results = push(results,{"id":candidate,"result":item}); cursor = candidate
+        }
+        result = {"ok":!failed,"value":{"results":results,"truncated":page["truncated"],"next_after":cursor,"dry_run":dry_run,"directory_entries_buffered":page["directory_entries_buffered"]}}
+        if failed { result["code"] = "recovery_conflict"; result["error"] = "one or more transactions require inspection; existing evidence was preserved" }
+    } except error { result = {"ok":false,"code":"recovery_failed","error":to_string(error)} }
+    return result
+}
+
+export func verify_history(state, record) {
+    try {
+        text := read_bounded(record_path(state,record["id"]),1048576)
+        path := event_path(state,record)
+        if !file_exists(path) && !is_symlink(path) { return {"ok":false,"code":"history_missing","error":"record has no creation event; run recover"} }
+        if read_bounded(path,2162688) != event_text(record,text) { return {"ok":false,"code":"history_conflict","error":"creation event does not match record bytes"} }
+        return {"ok":true}
+    } except error { return {"ok":false,"code":"history_invalid","error":to_string(error)} }
 }

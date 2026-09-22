@@ -8,3 +8,7 @@ Use `bash scripts/validate.sh` for the full gate (including CLI, byte bounds and
 path after `--`. Run `kujo run scripts/benchmark.kujo` or append `-- tree` for
 reproducible corruption-page and 10,001-file measurements. Preserve all page
 cursors/warnings. Trust and crash-recovery limits are in `docs/security.md`.
+Use the runtime revision in CI; version 1.4.0 alone is not a capability check.
+`tests/recovery_test.kujo -- <runtime>` kills isolated workers at transaction
+boundaries. Keep journal publication before records/events; preserve per-ID
+process locking, stable lock inodes and no-replace replay. See `docs/recovery.md`.

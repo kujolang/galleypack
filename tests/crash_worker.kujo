@@ -1,0 +1,16 @@
+from src.transactions import writer_lock, prepare_record, publish_record, publish_event, complete_record, journal_path, reserve_marker
+state := args()[0]; boundary := args()[1]
+record := {"id":"artifact-crash","actor":"test","created_at":"2026-09-22T00:00:00Z","payload":{"boundary":boundary}}
+text := to_json_pretty(record) + "\n"
+handle := writer_lock(state,record["id"])
+reserve_marker(state + "/locks/" + record["id"] + ".lock")
+if boundary == "staged" {
+    write_file_atomic(journal_path(state,record["id"]) + ".stage",to_json_pretty({"schema_version":"1.0.0","record_text":text,"record_sha256":sha256(text)}) + "\n",false)
+}
+if boundary != "locked" && boundary != "staged" { prepare_record(state,record,text) }
+if boundary == "record" || boundary == "event" || boundary == "complete" { publish_record(state,record,text) }
+if boundary == "event" || boundary == "complete" { publish_event(state,record,text) }
+if boundary == "complete" { complete_record(state,record["id"]) }
+// The child shell kills its parent Kujo process: no cleanup/finally can run.
+spawn_process(["sh","-c","kill -KILL \"$PPID\""],{"timeout_ms":5000,"max_output_bytes":4096})
+throw("crash injection did not terminate the worker")

@@ -1,3 +1,4 @@
+from tests.support import cleanup
 from src.storage import initialize, save_new, load_record
 from src.common import get
 root := "/tmp/galleypack-concurrency-" + uuid_v4()
@@ -19,6 +20,10 @@ assert(len(list_dir(root + "/locks")) == 0, "no leaked locks")
 record := load_record(root, "artifact-contended")
 event := parse_json(read_file(root + "/history/" + list_dir(root + "/history")[0]))
 assert(record["ok"] && event["record_sha256"] == record["checksum"], "event checksum matches winning record")
-for dir in ["records", "history", "locks"] { for name in list_dir(root + "/" + dir) { delete_file(root + "/" + dir + "/" + name) }; os_rmdir(root + "/" + dir) }
-delete_file(root + "/metadata.json"); os_rmdir(root)
-print("24-writer contention: one winner, matching event, no leaked locks")
+// Independent IDs retain concurrent progress; no state-wide writer mutex.
+distinct := spawn_process(["sh", "-c", "i=0; while [ \"$i\" -lt 24 ]; do \"$1\" run tests/concurrency_worker.kujo -- \"$2\" \"$i\" distinct > \"$2/result-$i.json\" & i=$((i+1)); done; wait", "galleypack-distinct", runtime, root], {"timeout_ms":30000,"max_output_bytes":4096})
+assert(distinct.exitcode == 0,"distinct workers completed")
+for index in range(24) { assert(parse_json(read_file(root + "/result-" + to_string(index) + ".json"))["ok"],"all distinct writers commit") }
+assert(len(list_dir(root + "/history")) == 25 && len(list_dir(root + "/transactions")) == 0 && len(list_dir(root + "/locks")) == 0,"all distinct events committed without pending intents or sentinels")
+cleanup(root)
+print("24 same-ID writers: one winner; 24 distinct-ID writers: all committed; no pending intents/markers")

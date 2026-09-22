@@ -20,9 +20,14 @@ only `state` (nonempty string), `actor` (bounded nonempty string), and `limit`
 
 `report`, `history` and `export` return record pages, preserving the historical
 meaning of `history`; raw creation events live in `<state>/history/`. Pages add
-`next_after`, and record listings add `scanned`. Pass `--after <next_after>` until
+`next_after`, and record listings add `scanned`, `directory_entries_buffered` and
+`directory_entries_examined`. Pass `--after <next_after>` until
 `truncated` is false, including pages containing only warnings or nonmatching
-records. A cursor is a filename stem, used for comparison only, never a path.
+records. A cursor is a filename stem; the `.json` suffix is restored for exclusive filename
+comparison. This preserves filename ordering for IDs that prefix other IDs. It is
+never treated as a path.
+The native directory heap retains at most 1,001 names; enumeration remains O(N).
+Directory entries must have UTF-8 names; native enumeration errors fail explicitly.
 Each page parses up to 1,000 candidates, returns up to the requested record limit,
 and retains at most 4 MiB of source record text. A full page may conservatively
 report truncation if more candidates remain, even when they do not match a filter.
@@ -33,10 +38,15 @@ each returned ID; preserve and review all warnings.
 
 UTF-8 byte limits: config/metadata 64 KiB, input/record 1 MiB, core artifact 64 MiB,
 rendered export 8 MiB. A page is not silently discarded to fit a rendered export:
-an oversized rendering fails with `output_too_large`. `--force` affects only the
-explicit export output. Record filenames and JSON layouts remain unchanged; new
-locks are exclusive regular files at the same `.lock` paths used by legacy lock
-directories. See [security and crash recovery](security.md).
+an oversized rendering fails with `output_too_large`. Record/event filenames and
+JSON layouts remain unchanged. Additive `transactions/` intent files and persistent
+`writer-locks/` lock inodes implement replay; temporary compatibility markers remain
+at the original `locks/<id>.lock` paths. Interrupted publication returns
+`recovery_required`; reads never expose a pending transaction as a complete record.
+Doctor/validation diagnose missing or conflicting creation events. `recover` repairs
+missing events and replays intents, but never overwrites conflicting evidence.
+`--force` can remove legacy locks during recovery only after old writers stop.
+See [recovery and migration](recovery.md).
 
 ## Optional library APIs
 
@@ -66,3 +76,9 @@ Import `src.hardening` directly; these functions are not CLI subcommands:
 No runtime package dependencies beyond Kujo are introduced. Supported execution
 is POSIX; CI builds pinned Kujo source. Runtime primitives remain part of the
 trusted computing base.
+
+
+The tested runtime pin is `cf785c0a7953717af16b657cda05b85d628144c5` (Kujo 1.4.0).
+Runtime builds predating the required native APIs are no longer supported; storage
+mutators resolve these capabilities before filesystem changes. This is an explicit
+runtime prerequisite change, not a record-format migration.

@@ -34,7 +34,11 @@ galleypack --version --json
 galleypack doctor --json
 ```
 
-Kujo 1.0.1 or newer is required. No hosted service or sibling tool is required.
+Kujo 1.4.0 with the native directory-page and durable-publication APIs is required.
+Use the tested runtime revision `cf785c0a7953717af16b657cda05b85d628144c5`
+(or a compatible later build); the version string alone does not identify these APIs.
+Older runtimes must be upgraded before writing. Existing 0.1.0/0.2.0 records do not
+need conversion. No hosted service or sibling tool is required.
 
 ## Quick start
 
@@ -59,6 +63,7 @@ galleypack diff --id package-example-v1 --other-id package-example-v2 --json
 | `claims compare`, `diff` | Compare two immutable records and artifact hashes. |
 | `validate` | Re-hash bound files and fail on missing files or byte drift. |
 | `show`, `report`, `history`, `export` | Inspect and emit bounded package evidence. |
+| `recover` | Preview or replay interrupted transactions and repair missing legacy creation events. |
 | `doctor`, `version` | Report health and runtime compatibility. |
 
 Common flags include `--state`, `--config`, `--input`, `--actor`, `--timestamp`,
@@ -90,3 +95,8 @@ checksum, archive-plan, object-store and semantic helpers are imported from
 
 The [repository hardening audit](docs/audits/repository-hardening.md) records
 baselines, fixes, compatibility notes, measurements and remaining limitations.
+
+For interrupted writes, run `./bin/galleypack recover --state PATH --dry-run --json`,
+then repeat without `--dry-run`. Follow `next_after` while `truncated` is true.
+Legacy locks require stopping old writers and explicitly adding `--force`.
+See [recovery and migration](docs/recovery.md).

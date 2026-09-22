@@ -14,8 +14,10 @@ cd "$ROOT"
 "$KUJO_RUNTIME" run tests/hardening_test.kujo
 "$KUJO_RUNTIME" run tests/audit_test.kujo
 "$KUJO_RUNTIME" run tests/bounds_test.kujo
+"$KUJO_RUNTIME" run tests/directory_page_test.kujo
 "$KUJO_RUNTIME" run tests/concurrency_test.kujo -- "$KUJO_RUNTIME"
 "$KUJO_RUNTIME" run tests/cli_test.kujo -- "$KUJO_RUNTIME"
+"$KUJO_RUNTIME" run tests/recovery_test.kujo -- "$KUJO_RUNTIME"
 while IFS= read -r document; do "$KUJO_RUNTIME" run scripts/validate_json.kujo -- "$document"; done < <(find fixtures schemas -type f -name '*.json' -print | sort)
 tmp_state="$(mktemp -d)"; trap 'find "$tmp_state" -depth -delete' EXIT
 KUJO_BIN="$KUJO_RUNTIME" ./bin/galleypack --help >/dev/null
