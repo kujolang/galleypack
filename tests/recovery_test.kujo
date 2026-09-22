@@ -9,8 +9,8 @@ root := "/tmp/galleypack-recovery-" + uuid_v4(); create_dir(root)
 metadata := {"tool":"galleypack","contract_version":"1.0.0"}
 for boundary in ["locked","staged","intent","record","event","complete"] {
     state := root + "/" + boundary; assert(initialize(state,metadata)["ok"],"initialize crash state")
-    crashed := spawn_process([runtime,"run","tests/crash_worker.kujo","--",state,boundary],{"timeout_ms":15000,"max_output_bytes":4096})
-    assert(crashed.exitcode != 0,"worker killed at " + boundary)
+    crashed := spawn_process(["sh","-c","\"$1\" run tests/crash_worker.kujo -- \"$2\" \"$3\"; result=$?; exit \"$result\"","galleypack-crash",runtime,state,boundary],{"timeout_ms":15000,"max_output_bytes":4096})
+    assert(crashed.exitcode == 137 && !crashed.timed_out && !crashed.cancelled,"worker received SIGKILL at " + boundary)
     pending := boundary == "intent" || boundary == "record" || boundary == "event"
     if pending {
         assert(len(list_records(state,"","",100)["warnings"]) > 0,"pending intent visible even without record")
