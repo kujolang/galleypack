@@ -1,0 +1,1 @@
+Directory paging passed: 5000 entries, <=1001 buffered names, complete cursor traversal and bounded recovery

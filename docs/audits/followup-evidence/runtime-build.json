@@ -1,0 +1,9 @@
+{
+  "source_commit": "cf785c0a7953717af16b657cda05b85d628144c5",
+  "command": "cargo build --release --locked --no-default-features --manifest-path $FOLLOWUP/runtime/Cargo.toml --target-dir $FOLLOWUP/target",
+  "result": "passed",
+  "version": "kujo 1.4.0",
+  "sha256": "5e412670eb127b2ff7efde6c9a095877f09231b255d28b9dd10a01c2bf286da1",
+  "build_receipt": "    Finished `release` profile [optimized] target(s) in 49m 31s",
+  "note": "Shared host under compilation and memory pressure; build duration is not a performance claim."
+}

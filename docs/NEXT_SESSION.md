@@ -12,3 +12,7 @@ Completed 2026-08-14. Hardening contracts materialize safe review trees, hash up
 These are library contracts and adapter plans, not executed archive/object-store
 implementations. See [contracts](contracts.md) and the
 [2026-09-22 audit](audits/repository-hardening.md) for corrected bounds and gaps.
+
+The [directory/recovery follow-up](audits/directory-and-recovery.md) closes the two
+original open storage findings. Use the updated runtime pin and `recover --dry-run`
+before repairing interrupted state; see [operator guide](recovery.md).

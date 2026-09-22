@@ -1,5 +1,10 @@
 # GalleyPack repository hardening — 2026-09-22
 
+**Follow-up:** GP-13 and GP-14 were subsequently implemented at the user's request.
+See [directory paging and crash recovery](directory-and-recovery.md) for updated
+runtime requirements, compatibility, proof and final state. The original baseline
+and measurements below remain historical evidence.
+
 ## Repository and scope
 
 - Repository: `kujolang/galleypack`; branch: `main`.
@@ -57,8 +62,8 @@ established by the runtime's `create_dir_all` implementation, not an invented fa
 | GP-10 | P2 | Adapters | Archive paths unvalidated; invalid signing-key types silently produced unsigned receipts. | Reject ambiguous/unsafe paths and nonstring signing keys; preserve explicit empty-string unsigned mode. | Fixed. |
 | GP-11 | P2 | Portability / docs | Launcher used a developer-specific path; example lacked required `--path`; schema excluded supported 0.1.0 records; docs overstated adapter execution. | Portable runtime discovery, schema/example corrections, precise library and recovery contracts. | Fixed. |
 | GP-12 | P2 | Supply chain / CI | CI compiled unused runtime default features; no contention, bounds or >10,000-file ratchets. | Locked minimal-runtime build and expanded deterministic correctness gates. | Verification recorded below. |
-| GP-13 | P2 | Large ledgers | `sort(list_dir(...))` still materializes every filename before bounded record parsing. | Document and retain source evidence; needs additive runtime directory paging or a recoverable index. | Open; no constant-memory listing claim. |
-| GP-14 | P2 | Crash recovery | Record/event commits remain two separate filesystem publications; process/power failure can leave a lock or orphan record. | Document manual recovery; ordinary error rollback tested. Automatic journaling/reconciliation requires a design and compatibility decision. | Open; not a multi-tenant security finding. |
+| GP-13 | P2 | Large ledgers | `sort(list_dir(...))` still materializes every filename before bounded record parsing. | Document and retain source evidence; needs additive runtime directory paging or a recoverable index. | Resolved in [follow-up](directory-and-recovery.md); bounded filename heap, O(N) traversal. |
+| GP-14 | P2 | Crash recovery | Record/event commits remain two separate filesystem publications; process/power failure can leave a lock or orphan record. | Document manual recovery; ordinary error rollback tested. Automatic journaling/reconciliation requires a design and compatibility decision. | Resolved in [follow-up](directory-and-recovery.md) with durable intents and replay. |
 
 ## Changes and compatibility proof
 
@@ -176,7 +181,7 @@ No external notification, remote issue or sibling modification was performed. Re
 ## Remaining work
 
 - **P0/P1:** no unresolved introduced regressions or validated high-severity vulnerabilities.
-- **P2:** GP-13 eager filename enumeration; GP-14 explicit crash consistency/reconciliation.
+- **P2:** the original GP-13/GP-14 items are now resolved in the [follow-up](directory-and-recovery.md).
 - **P3:** no cosmetic refactor proposed.
 - **Needs more evidence:** hostile concurrent filesystem mutation would require a different
   threat model and descriptor-relative runtime APIs; do not promise this protection today.

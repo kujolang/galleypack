@@ -1,0 +1,6 @@
+{
+  "runtime": "1.0.1",
+  "exit_code": 1,
+  "state_created": false,
+  "diagnostic": "{\n  \"contract_version\": \"1.0.0\",\n  \"data\": null,\n  \"error\": \"Error { line: 0, message: Undefined variable: list_dir_page, stack: [] }\",\n  \"error_code\": \"operation_failed\",\n  \"ok\": false,\n  \"tool_version\": \"0.2.0\"\n}"
+}
