@@ -80,13 +80,9 @@ export func envelope(ok, data, error, code, version, contract) {
     return {"ok": ok, "data": data, "error": error, "error_code": code, "tool_version": version, "contract_version": contract}
 }
 
-// Kujo 1.0.1 has character-count len, but no byte_length builtin.
+// Native UTF-8 length avoids allocating a Base64 copy of every bounded input.
 export func utf8_size(text) {
-    encoded := encode_base64(text)
-    count := to_int(len(encoded) / 4) * 3
-    if ends_with(encoded, "==") { return count - 2 }
-    if ends_with(encoded, "=") { return count - 1 }
-    return count
+    return byte_length(text)
 }
 
 // Preserve lstat errors while detecting absent/dangling leaves with bounded memory.
@@ -108,5 +104,5 @@ export func is_symlink(path) {
 
 export func require_storage_runtime() {
     // Name resolution is deliberate: old runtimes fail before creating state.
-    assert(type(list_dir_page) == "function" && type(file_lock) == "function" && type(publish_file_noreplace) == "function", "GalleyPack requires Kujo revision cf785c0 or newer")
+    assert(type(list_dir_page) == "function" && type(file_lock) == "function" && type(publish_file_noreplace) == "function" && type(sha256_file_beneath) == "function" && type(byte_length) == "function", "GalleyPack requires Kujo 1.5.0 or newer")
 }

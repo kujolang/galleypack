@@ -63,8 +63,9 @@ Import `src.hardening` directly; these functions are not CLI subcommands:
   integrity receipt, not a public-key signature or a verification API.
 - `streaming_tree_hash(root, relative_paths, maximum_files)`: 1..100,000 distinct
   declared files; lexicographic path ordering; 64 MiB per file and 1 GiB total.
-  File contents use the runtime's streaming hash; entry metadata is retained in
-  memory. The public checksum-manifest limit does not constrain this tree path.
+  File contents use a confined no-follow handle and a fixed 64 KiB read buffer.
+  The per-file and remaining total budgets apply during hashing; receipt sizes
+  count actual hashed bytes. Entry metadata is retained in memory. The public checksum-manifest limit does not constrain this tree path.
 - `archive_adapter_plan(format, entries, adapter)`: deterministic TAR/ZIP **plans**
   for 1..10,000 safe distinct relative file paths, normalized timestamps/owners and
   declared adapter capabilities. Does not create an archive.
@@ -78,7 +79,7 @@ is POSIX; CI builds pinned Kujo source. Runtime primitives remain part of the
 trusted computing base.
 
 
-The tested runtime pin is `cf785c0a7953717af16b657cda05b85d628144c5` (Kujo 1.4.0).
+The tested runtime pin is `cc2d7dbb59a8dc05f00d629e100932f56f4062f6` (Kujo 1.5.0).
 Runtime builds predating the required native APIs are no longer supported; storage
 mutators resolve these capabilities before filesystem changes. This is an explicit
 runtime prerequisite change, not a record-format migration.

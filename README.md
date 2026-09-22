@@ -34,8 +34,8 @@ galleypack --version --json
 galleypack doctor --json
 ```
 
-Kujo 1.4.0 with the native directory-page and durable-publication APIs is required.
-Use the tested runtime revision `cf785c0a7953717af16b657cda05b85d628144c5`
+Kujo 1.5.0 or a compatible later runtime is required.
+Use the tested runtime revision `cc2d7dbb59a8dc05f00d629e100932f56f4062f6`
 (or a compatible later build); the version string alone does not identify these APIs.
 Older runtimes must be upgraded before writing. Existing 0.1.0/0.2.0 records do not
 need conversion. No hosted service or sibling tool is required.

@@ -103,9 +103,17 @@ export func streaming_tree_hash(root, relative_paths, maximum_files) {
         for relative in sort(relative_paths) {
             if !safe_tree_file(root, relative) { return {"ok": false, "error": "tree entry is missing or unsafe"} }
             path := root + "/" + relative; size := file_size(path)
-            total = total + size
-            if size > 67108864 || total > 1073741824 { return {"ok": false, "error": "tree exceeds 64 MiB per file or 1 GiB total"} }
-            entries = push(entries, {"path": relative, "bytes": size, "sha256": sha256_file(path)})
+            if size > 67108864 || total + size > 1073741824 { return {"ok": false, "error": "tree exceeds 64 MiB per file or 1 GiB total"} }
+            // The held no-follow file handle enforces bounds during the read too.
+            // Count actual hashed bytes, not metadata sampled before opening.
+            remaining := 1073741824 - total
+            mut maximum := 67108864
+            if remaining < maximum { maximum = remaining }
+            if maximum == 0 { maximum = 1 }
+            digest := sha256_file_beneath(root, relative, maximum)
+            total = total + digest["bytes"]
+            if total > 1073741824 { return {"ok": false, "error": "tree exceeds 64 MiB per file or 1 GiB total"} }
+            entries = push(entries, {"path": relative, "bytes": digest["bytes"], "sha256": digest["sha256"]})
         }
     } except error { return {"ok": false, "error": "tree hash failed: " + to_string(error)} }
     // These internally constructed rows contain only string keys and scalar values.

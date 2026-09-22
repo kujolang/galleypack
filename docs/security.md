@@ -6,8 +6,10 @@ GalleyPack has no publishing or ACT capability.
 
 State and caller-selected root ancestors must be operator controlled. IDs reject
 traversal, managed state directories and record leaves reject symlinks, and
-optional tree hashing rejects symlinks in every relative path component. These
-checks are not a sandbox against an adversary replacing directories concurrently.
+optional tree hashing opens every relative component without following symlinks,
+then hashes through the held file handle with an enforced read budget. Its byte
+receipt covers the bytes hashed; concurrent content mutation is not a snapshot.
+Other path checks are not a sandbox against hostile directory replacement.
 Source/config paths and stored relative artifact paths resolve against invocation
 CWD; use absolute artifact paths when validating from different directories.
 

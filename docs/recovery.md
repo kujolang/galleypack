@@ -1,8 +1,7 @@
 # Transaction recovery
 
-Use the Kujo revision pinned in CI (`cf785c0a7953717af16b657cda05b85d628144c5`)
-or a compatible later runtime. Older 1.0.x runtimes and early 1.4.0 builds lack
-required APIs. Install/upgrade the runtime before changing state; record and
+Use Kujo 1.5.0, pinned in CI at `cc2d7dbb59a8dc05f00d629e100932f56f4062f6`,
+or a compatible later runtime. Older runtimes lack required APIs. Install/upgrade the runtime before changing state; record and
 history JSON formats, IDs, checksums and artifact paths do not need migration.
 An undefined `list_dir_page`, `file_lock` or `publish_file_noreplace` error means
 the runtime needs this upgrade; it is not a reason to alter stored records.

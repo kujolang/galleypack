@@ -4,6 +4,8 @@ root := "/tmp/galleypack-cli-" + uuid_v4(); create_dir(root)
 func cli(tokens) { return spawn_process(concat([runtime,"run","galleypack.kujo","--"],tokens), {"timeout_ms":10000,"max_output_bytes":16384}) }
 version := cli(["--version","--json"])
 assert(version.exitcode == 0 && parse_json(version.stdout)["ok"], "version alias honors JSON")
+requirements := parse_json(version.stdout)["data"]
+assert(requirements["minimum_kujo"] == "1.5.0" && requirements["minimum_kujo_revision"] == "cc2d7dbb59a8dc05f00d629e100932f56f4062f6", "version advertises pinned runtime prerequisite")
 missing := cli(["report","--state"]); assert(missing.exitcode == 2, "missing flag value exits 2")
 unknown := cli(["--version","--unknown","x"]); assert(unknown.exitcode == 2, "version validates options")
 config := root + "/bad.json"; write_file(config, "{\"state\":42}", true)
@@ -26,4 +28,4 @@ assert(recovery.exitcode == 0 && parse_json(recovery.stdout)["data"]["dry_run"] 
 invalid_recovery := cli(["recover","--state",root + "/absent","--id","../bad","--json"])
 assert(invalid_recovery.exitcode == 1 && parse_json(invalid_recovery.stdout)["error_code"] == "unsafe_id","recovery rejects unsafe IDs")
 cleanup(root)
-print("12 CLI contract assertions passed")
+print("13 CLI contract assertions passed")

@@ -145,7 +145,7 @@ export func dispatch(command, parsed) {
         checked := inspect_state(state,{"tool":p["slug"],"contract_version":p["contract_version"]}); if !checked["ok"] { return checked }
         return recover(state,flag(parsed,"id",""),flag(parsed,"after",""),limit["value"],flag(parsed,"dry-run",false),flag(parsed,"force",false))
     }
-    if command == "version" { return {"ok": true, "value": {"tool": p["slug"], "version": p["version"], "contract_version": p["contract_version"], "supported_record_versions": get(p, "record_versions", [p["version"]]), "minimum_kujo": "1.4.0", "minimum_kujo_revision":"5b057c6"}} }
+    if command == "version" { return {"ok": true, "value": {"tool": p["slug"], "version": p["version"], "contract_version": p["contract_version"], "supported_record_versions": get(p, "record_versions", [p["version"]]), "minimum_kujo": "1.5.0", "minimum_kujo_revision":"cc2d7dbb59a8dc05f00d629e100932f56f4062f6"}} }
     if command == "doctor" {
         state_error := validate_state_path(state); listing := {"records": [], "warnings": [], "truncated": false}
         if state_error == "" { listing = list_records(state, "", "", 1000) }
@@ -158,7 +158,7 @@ export func dispatch(command, parsed) {
         if listing["truncated"] { code = "inspection_incomplete"; error = "state exceeds inspection bounds; inspect paginated records" }
         if state_error != "" { code = "unsafe_state"; error = state_error }
         if state_error == "" && len(listing["warnings"]) > 0 { code = "corrupt_state"; error = "one or more records are unreadable" }
-        return {"ok": healthy, "code": code, "error": error, "value": {"healthy": healthy, "tool": p["slug"], "version": p["version"], "minimum_kujo": "1.4.0", "minimum_kujo_revision":"5b057c6", "state": state, "record_count": len(listing["records"]), "truncated": listing["truncated"], "next_after": get(listing, "next_after", ""), "corrupt_records": listing["warnings"], "limits": {"input_bytes": 1048576, "record_bytes": 1048576, "artifact_bytes": 67108864, "list_records": 1000}, "limitations": p["limitations"]}}
+        return {"ok": healthy, "code": code, "error": error, "value": {"healthy": healthy, "tool": p["slug"], "version": p["version"], "minimum_kujo": "1.5.0", "minimum_kujo_revision":"cc2d7dbb59a8dc05f00d629e100932f56f4062f6", "state": state, "record_count": len(listing["records"]), "truncated": listing["truncated"], "next_after": get(listing, "next_after", ""), "corrupt_records": listing["warnings"], "limits": {"input_bytes": 1048576, "record_bytes": 1048576, "artifact_bytes": 67108864, "list_records": 1000}, "limitations": p["limitations"]}}
     }
     if has(p["show_commands"], command) {
         id := flag(parsed, "id", ""); if id == "" { return {"ok": false, "code": "id_required", "error": "show requires --id"} }

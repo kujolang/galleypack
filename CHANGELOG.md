@@ -2,11 +2,14 @@
 
 ## Unreleased
 
+- Pin Kujo 1.5.0; hash review trees through bounded no-follow handles with actual
+  byte receipts, and replace Base64 byte counting with native UTF-8 length.
+
 - Added bounded native directory pages and corrected continuation for prefix-related IDs.
 - Added durable write intents, per-ID OS locks, idempotent `recover`/dry-run, legacy
   orphan repair and crash-injection gates; conflicting evidence is never overwritten.
 - Doctor and validation now detect creation-event inconsistency. Runtime prerequisite
-  advances to the CI-pinned Kujo 1.4.0 build with required filesystem primitives.
+  advances to the CI-pinned Kujo 1.5.0 release.
 
 - Made record locks and immutable record/event publication exclusive under contention.
 - Made dry runs side-effect free; validate CLI/config shapes and calendar dates.
