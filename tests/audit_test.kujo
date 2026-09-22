@@ -1,0 +1,36 @@
+from tests.support import cleanup
+from src.core import dispatch, main
+from src.args import parse_args
+from src.common import valid_timestamp
+from src.hardening import materialize_review_package, streaming_tree_hash, archive_adapter_plan
+mut passed := 0; mut failed := 0
+func check(ok, label) { if ok { passed = passed + 1 } else { failed = failed + 1; eprint("FAIL: " + label) } }
+func opts(values) { return parse_args(values, ["json", "dry-run", "force"]) }
+root := "/tmp/galleypack-audit-" + uuid_v4(); create_dir(root)
+artifact := root + "/article"; write_file(artifact, "evidence", true)
+dry := root + "/dry"
+result := dispatch("add", opts(["--state", dry, "--input", "fixtures/core.json", "--path", artifact, "--actor", "tester", "--dry-run"]))
+check(result["ok"] && !file_exists(dry), "dry run does not initialize state")
+check(len(opts(["--state"])["errors"]) == 1, "missing value is a usage error")
+check(main(["--version", "--unknown"]) == 2, "version alias validates trailing flags")
+check(!valid_timestamp("2026-02-31T00:00:00Z") && valid_timestamp("2024-02-29T00:00:00Z"), "calendar timestamp validation")
+duplicate := materialize_review_package({"entries": [{"path":"one", "content":"a"}, {"path":"one", "content":"b"}]}, root + "/duplicate")
+check(!duplicate["ok"] && !file_exists(root + "/duplicate"), "duplicate manifest rejected before writes")
+bad := materialize_review_package({"entries": [{"path":"one", "content":"a"}, {"path":"../outside", "content":"b"}]}, root + "/bad")
+check(!bad["ok"] && !file_exists(root + "/bad"), "invalid later entry leaves no partial package")
+mut collision := {"ok": true}
+try { collision = materialize_review_package({"entries": [{"path":"a/b", "content":"a"}, {"path":"a", "content":"b"}]}, root + "/collision") } except error {}
+check(!collision["ok"] && !file_exists(root + "/collision"), "directory collision rejected before writes")
+adapter := {"id":"fixture", "offline":true, "normalizes_timestamps":true, "sorts_entries":true}
+check(!archive_adapter_plan("tar", ["../escape"], adapter)["ok"], "archive plan validates entry paths")
+create_dir(root + "/tree"); create_dir(root + "/outside"); write_file(root + "/outside/file", "outside", true)
+linked := spawn_process(["ln", "-s", root + "/outside", root + "/tree/link"], {"timeout_ms":5000,"max_output_bytes":4096})
+check(linked.exitcode == 0, "symlink fixture created")
+check(!streaming_tree_hash(root + "/tree", ["link/file"], 10)["ok"], "tree hashing rejects intermediate symlinks")
+
+trailing := materialize_review_package({"entries":[{"path":"file", "content":"ok"}]}, root + "/trailing/")
+check(trailing["ok"] && path_is_file(root + "/trailing/file"), "trailing output separator remains supported")
+
+cleanup(root)
+print(to_string(passed) + " passed; " + to_string(failed) + " failed")
+if failed > 0 { exit(1) }

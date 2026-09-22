@@ -20,8 +20,12 @@ jobs:
         with:
           toolchain: stable
       - name: Build pinned Kujo runtime
-        run: cargo build --release --manifest-path .runtime/kujo/Cargo.toml
+        run: cargo build --release --locked --no-default-features --manifest-path .runtime/kujo/Cargo.toml
       - name: Validate
         env:
           KUJO_BIN: ${{ github.workspace }}/.runtime/kujo/target/release/kujo
         run: bash scripts/validate.sh
+      - name: Verify declared tree capacity
+        env:
+          KUJO_BIN: ${{ github.workspace }}/.runtime/kujo/target/release/kujo
+        run: '"$KUJO_BIN" run scripts/benchmark.kujo -- tree'

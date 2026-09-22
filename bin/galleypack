@@ -8,6 +8,10 @@ if [ -z "${KUJO_BIN:-}" ]; then
         KUJO_BIN="$ROOT/../kujo/target/release/kujo"
     fi
 fi
+case "$KUJO_BIN" in
+    */*) ;;
+    *) KUJO_BIN=$(command -v "$KUJO_BIN" 2>/dev/null || true) ;;
+esac
 if [ ! -x "$KUJO_BIN" ]; then
     printf 'GalleyPack: Kujo runtime not found; set KUJO_BIN.\n' >&2
     exit 2

@@ -1,0 +1,48 @@
+from src.core import dispatch
+from src.storage import initialize, list_records, save_new
+from src.common import get, utf8_size
+from src.args import parse_args
+from src.hardening import checksum_manifest, materialize_review_package, streaming_tree_hash
+from tests.support import cleanup
+func opts(values) { return parse_args(values, ["json", "dry-run", "force"]) }
+root := "/tmp/galleypack-bounds-" + uuid_v4()
+assert(initialize(root, {"tool":"galleypack","contract_version":"1.0.0"})["ok"], "init bounds fixture")
+record := {"schema_version":"1.0.0", "tool_version":"0.1.0", "contract_version":"1.0.0", "id":"relationship-demo", "record_type":"artifact_relationship", "command":"relate", "actor":"tester", "created_at":"2026-09-22T00:00:00Z", "provenance":[], "payload":{"artifact_id":"artifact-one","related_artifact_id":"artifact-two","relationship":"variant"}}
+for index in range(1001) {
+    record["id"] = "relationship-" + to_string(10000 + index)
+    write_file(root + "/records/" + record["id"] + ".json", to_json(record), true)
+}
+validation := dispatch("validate", opts(["--state",root]))
+assert(!validation["ok"] && validation["code"] == "inspection_incomplete", "truncated validation cannot certify state")
+doctor := dispatch("doctor", opts(["--state",root]))
+assert(!doctor["ok"] && doctor["value"]["truncated"], "doctor discloses incomplete inspection")
+filtered := list_records(root, "missing-kind", "", 100)
+assert(filtered["scanned"] == 1000 && filtered["truncated"], "filtered scans have a work bound")
+next := list_records(root, "", filtered["next_after"], 100)
+assert(len(next["records"]) == 1 && !next["truncated"], "cursor resumes after nonmatching records")
+for name in list_dir(root + "/records") { write_file(root + "/records/" + name, "{", true) }
+corrupt := list_records(root, "", "", 1000)
+assert(len(corrupt["warnings"]) == 1000 && corrupt["truncated"], "corrupt warnings bounded")
+for name in list_dir(root + "/records") { delete_file(root + "/records/" + name) }
+mut text := "é"
+for index in range(19) { text = text + text }
+record["id"] = "relationship-unicode"; record["payload"] = {"note":text}
+oversized := save_new(root, record)
+assert(!oversized["ok"] && oversized["code"] == "record_too_large", "UTF-8 record byte limit")
+assert(len(list_dir(root + "/locks")) == 0, "oversized record leaves no lock")
+assert(utf8_size("é🙂") == 6 && utf8_size("a") == 1 && utf8_size("ab") == 2 && utf8_size("") == 0, "UTF-8 exact length")
+manifest := materialize_review_package({"entries":[{"path":"unicode.txt","content":"é🙂"}]}, root + "/unicode")
+assert(manifest["ok"] && manifest["entries"][0]["bytes"] == 6, "materialized manifest uses bytes")
+assert(checksum_manifest(manifest["entries"], "éééééééé")["ok"], "HMAC minimum measured in bytes")
+assert(!checksum_manifest(manifest["entries"], 17)["ok"], "invalid signing key cannot silently produce unsigned receipt")
+assert(!streaming_tree_hash(root + "/unicode", ["unicode.txt","unicode.txt"], 10)["ok"], "duplicate tree paths rejected")
+// A page's retained source record text cannot exceed 4 MiB.
+record["payload"] = {"note":substring(text, 0, 200000)}
+for index in range(20) { record["id"] = "relationship-big-" + to_string(100 + index); write_file(root + "/records/" + record["id"] + ".json", to_json(record), true) }
+page := list_records(root, "", "", 1000)
+assert(page["truncated"] && len(page["records"]) == 10, "page byte budget")
+config := root + "/config.json"; write_file(config, "{\"state\":42}", true)
+assert(!dispatch("report", opts(["--config",config]))["ok"], "invalid config shape fails structurally")
+assert(!dispatch("unrecognized", opts(["--state",root,"--actor","tester"]))["ok"], "direct dispatch cannot persist unknown commands")
+cleanup(root)
+print("16 bounds and compatibility assertions passed")

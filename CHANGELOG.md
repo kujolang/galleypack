@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Made record locks and immutable record/event publication exclusive under contention.
+- Made dry runs side-effect free; validate CLI/config shapes and calendar dates.
+- Bound filtered/corrupt record scans and retained page bytes with continuation cursors;
+  fail incomplete whole-state validation instead of certifying partial coverage.
+- Enforced UTF-8 byte limits, validated complete review manifests before writes,
+  rejected intermediate tree symlinks and unsafe adapter paths, and fixed >10,000-file hashing.
+- Corrected schema compatibility, portable launcher resolution and library capability docs;
+  added concurrency, bounds, CLI and security regression gates.
+
 - Standardized README badge ordering and repository-local artifact ignores.
 - Kept Loop Engineering evidence available locally while removing it from published source.
 

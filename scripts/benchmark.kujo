@@ -1,0 +1,38 @@
+from src.storage import list_records, initialize, save_new, load_record
+from src.common import get, canonical_json
+from src.hardening import streaming_tree_hash
+from tests.support import cleanup
+// Fixture creation is outside timing. Pass tree to exercise >10,000 files.
+root := "/tmp/galleypack-benchmark-" + uuid_v4()
+reuse := len(args()) > 1
+if reuse { root = args()[1]; assert(path_is_dir(root), "existing benchmark root required") } else { create_dir(root) }
+mode := "listing"; if len(args()) > 0 { mode = args()[0] }
+if mode == "tree" {
+    count := 10001
+    mut paths := []
+    for index in range(count) { name := "file-" + to_string(index); if !reuse { write_file(root + "/" + name, "evidence", true) }; paths = push(paths, name) }
+    start := performance_now(); result := streaming_tree_hash(root, paths, 100000); elapsed := performance_now() - start
+    print(to_json({"mode":mode,"files":count,"ok":result["ok"],"elapsed_ms":elapsed,"receipt":result}))
+    assert(result["ok"] && result["files"] == count, "tree hashing supports more than 10000 files")
+} else if mode == "serialization" {
+    mut entries := []
+    for index in range(1000) { entries = push(entries, {"path":"file-" + to_string(index),"bytes":8,"sha256":sha256("evidence")}) }
+    start := performance_now(); canonical := canonical_json(entries); canonical_ms := performance_now() - start
+    start = performance_now(); native := to_json(entries); native_ms := performance_now() - start
+    assert(canonical == native, "internal tree encoding is byte-equivalent")
+    print(to_json({"mode":mode,"entries":1000,"bytes":len(native),"canonical_ms":canonical_ms,"native_ms":native_ms,"equivalent":true}))
+} else if mode == "bytes" {
+    initialize(root, {"tool":"galleypack","contract_version":"1.0.0"})
+    mut content := "é"; for index in range(19) { content = content + content }
+    record := {"id":"artifact-unicode", "actor":"fixture", "created_at":"2026-09-22T00:00:00Z", "payload":{"note":content}}
+    saved := save_new(root, record); loaded := load_record(root, record["id"])
+    mut stored_bytes := 0; if path_is_file(root + "/records/artifact-unicode.json") { stored_bytes = file_size(root + "/records/artifact-unicode.json") }
+    print(to_json({"mode":mode,"save_ok":saved["ok"],"load_ok":loaded["ok"],"save_code":get(saved,"code",null),"load_code":get(loaded,"code",null),"stored_bytes":stored_bytes}))
+} else {
+    create_dir(root + "/records")
+    count := 1500
+    for index in range(count) { write_file(root + "/records/record-" + to_string(10000 + index) + ".json", "{", true) }
+    start := performance_now(); result := list_records(root, "", "", 1000); elapsed := performance_now() - start
+    print(to_json({"mode":mode,"files":count,"warnings":len(result["warnings"]),"truncated":result["truncated"],"receipt_bytes":len(to_json(result)),"elapsed_ms":elapsed}))
+}
+if !reuse { cleanup(root) }

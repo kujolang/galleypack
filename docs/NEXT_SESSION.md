@@ -1,10 +1,14 @@
 # GalleyPack next-session worklist
 
 - [x] Materialize the full review-directory package shape from a declarative manifest.
-- [x] Add signed checksum manifests and detached verification bundles.
+- [x] Add checksum manifests with optional detached HMAC integrity receipts.
 - [x] Add streaming directory-tree hashing with benchmarked file-count limits.
-- [x] Add archive adapters for reproducible TAR and ZIP output.
+- [x] Add adapter plans for reproducible TAR and ZIP output.
 - [x] Add object-store adapters with offline contract fixtures and no implicit credentials.
 - [x] Add claim-delta semantic adapters while preserving a complete deterministic local path.
 
-Completed 2026-08-14. Hardening contracts materialize safe review trees, hash up to 100,000 declared files, sign detached manifests, require reproducible TAR/ZIP adapter evidence, validate credential-free object-store adapters, and always retain the deterministic local claim delta.
+Completed 2026-08-14. Hardening contracts materialize safe review trees, hash up to 100,000 declared files, produce detached HMAC receipts, require reproducible TAR/ZIP adapter evidence, validate credential-free object-store adapters, and always retain the deterministic local claim delta.
+
+These are library contracts and adapter plans, not executed archive/object-store
+implementations. See [contracts](contracts.md) and the
+[2026-09-22 audit](audits/repository-hardening.md) for corrected bounds and gaps.

@@ -15,7 +15,7 @@ operators can compare and verify offline.
 GalleyPack is ready for serious local package-control workflows: immutable
 records, atomic writes, per-record locks, bounded files and queries, exact
 artifact hashes, declarative review-tree materialization, signed tree manifests,
-bounded streaming hashes, reproducible archive adapter contracts,
+bounded streaming hashes, reproducible archive adapter plans,
 credential-free object-store conformance, deterministic and semantic claim
 deltas, and fail-closed drift validation. It does not modify source artifacts,
 average away missing reviews, interpret review as approval, or publish.
@@ -64,7 +64,10 @@ galleypack diff --id package-example-v1 --other-id package-example-v2 --json
 Common flags include `--state`, `--config`, `--input`, `--actor`, `--timestamp`,
 `--id`, `--other-id`, `--path`, `--type`, `--after`, `--limit`, `--output`,
 `--force`, `--dry-run`, and `--json`. Files are capped at 64 MiB in the core;
-records and inputs are capped at 1 MiB; queries are capped at 1,000 records.
+records and inputs are capped at 1 MiB of UTF-8 bytes. Query pages inspect at most
+1,000 candidate records and retain at most 4 MiB of record text. Continue with
+`--after <next_after>` while `truncated` is true. Whole-state inspection fails
+explicitly when its bounds prevent a complete result.
 
 State defaults to `.galleypack/`. Traversal, symlinks, secret-shaped fields,
 malformed JSON, schema-major mismatch, duplicate IDs, concurrent duplicate
@@ -80,4 +83,10 @@ writes, unsafe overwrite, and artifact drift fail closed. See
 bash scripts/validate.sh
 ```
 
-CI builds a pinned Kujo runtime and runs the identical gate.
+CI builds a pinned Kujo runtime and runs the identical gate. The launcher uses
+`KUJO_BIN`, then PATH, then a sibling Kujo release build. Optional review-tree,
+checksum, archive-plan, object-store and semantic helpers are imported from
+`src.hardening`; see their [contracts](docs/contracts.md).
+
+The [repository hardening audit](docs/audits/repository-hardening.md) records
+baselines, fixes, compatibility notes, measurements and remaining limitations.
