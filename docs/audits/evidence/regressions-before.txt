@@ -1,0 +1,21 @@
+FAIL: dry run does not initialize state
+FAIL: missing value is a usage error
+GalleyPack: ok
+{
+  "contract_version": "1.0.0",
+  "minimum_kujo": "1.0.1",
+  "supported_record_versions": [
+    "0.1.0",
+    "0.2.0"
+  ],
+  "tool": "galleypack",
+  "version": "0.2.0"
+}
+FAIL: version alias validates trailing flags
+FAIL: calendar timestamp validation
+FAIL: duplicate manifest rejected before writes
+FAIL: invalid later entry leaves no partial package
+FAIL: directory collision rejected before writes
+FAIL: archive plan validates entry paths
+FAIL: tree hashing rejects intermediate symlinks
+1 passed; 9 failed

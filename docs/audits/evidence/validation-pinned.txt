@@ -1,0 +1,12 @@
+check passed: galleypack.kujo
+13 passed; 0 failed
+9 passed; 0 failed
+8 passed; 0 failed
+5 passed; 0 failed
+10 passed; 0 failed
+GalleyPack: missing value for --unknown
+11 passed; 0 failed
+16 bounds and compatibility assertions passed
+24-writer contention: one winner, matching event, no leaked locks
+10 CLI contract assertions passed
+GalleyPack validation passed.

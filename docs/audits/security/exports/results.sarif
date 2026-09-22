@@ -1,0 +1,88 @@
+{
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "automationDetails": {
+        "id": "galleypack-local-20260922"
+      },
+      "properties": {
+        "codexSecuritySchemaVersion": "1.0",
+        "codexSecurityTargetKind": "git_revision"
+      },
+      "results": [
+        {
+          "level": "note",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/hardening.kujo"
+                },
+                "region": {
+                  "endLine": 10,
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Intermediate directory symlinks escape the declared hash root\n\nThe exported tree hasher checks only the root and final file for symlinks. A supplied root/link/file can hash an outside file through a directory symlink.\n\nSeverity: low\n\nCategory: Symlink following\n\nWeaknesses: CWE-61\n\nRemediation:\nReject every relative path component that is a symlink before hashing. Require operator-owned stable roots; do not promise protection from hostile concurrent replacement.\n\nRemediation tests:\n- tests/audit_test.kujo: real intermediate symlink is rejected"
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:59731316abbac952b314fb3d01d5e913b6435fa81e42f98dc843e92517689b64",
+            "primaryLocationLineHash": "ad07097d91bb3509:1"
+          },
+          "properties": {
+            "category": "symlink-following",
+            "confidence": "high",
+            "findingId": "csf_5b85275a9659e74cbe88475f",
+            "occurrenceId": "occ_d9bc663ad0f53fa5dff79831",
+            "severity": "low"
+          },
+          "ruleId": "symlink-tree-hash-escape",
+          "ruleIndex": 0
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "Codex Security",
+          "rules": [
+            {
+              "fullDescription": {
+                "text": "Symlink tree hash escape. Categories: Symlink following. Weaknesses: CWE-61."
+              },
+              "help": {
+                "markdown": "Symlink tree hash escape. Categories: Symlink following. Weaknesses: CWE-61.\n\n## Remediation\n\nReject every relative path component that is a symlink before hashing. Require operator-owned stable roots; do not promise protection from hostile concurrent replacement.",
+                "text": "Symlink tree hash escape. Categories: Symlink following. Weaknesses: CWE-61.\n\nRemediation:\n\nReject every relative path component that is a symlink before hashing. Require operator-owned stable roots; do not promise protection from hostile concurrent replacement."
+              },
+              "id": "symlink-tree-hash-escape",
+              "name": "Symlink tree hash escape",
+              "properties": {
+                "security-severity": "2.0",
+                "tags": [
+                  "external/cwe/cwe-061",
+                  "security",
+                  "symlink-following"
+                ]
+              },
+              "shortDescription": {
+                "text": "Symlink tree hash escape"
+              }
+            }
+          ],
+          "version": "0.1.24"
+        }
+      },
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "https://github.com/kujolang/galleypack",
+          "revisionId": "5a9ec247f943460aa759f1552ae14e48c7423d3e"
+        }
+      ]
+    }
+  ],
+  "version": "2.1.0"
+}

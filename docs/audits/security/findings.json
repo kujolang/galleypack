@@ -1,0 +1,77 @@
+{
+  "documentType": "codex-security.findings",
+  "findings": [
+    {
+      "attackPath": {
+        "dataflow": {
+          "summary": "Tree supplier places link directory under root; caller supplies link/file; joined path resolves to outside/file; file_size and sha256_file consume it."
+        },
+        "reachability": {
+          "summary": "Directly reachable through exported library API; absent from CLI. Attacker must supply the tree or alter its entries."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "export func streaming_tree_hash(root,relative_paths,maximum_files){if !path_is_dir(root)||path_is_symlink(root)||maximum_files<1||maximum_files>100000||type(relative_paths)!=\"array\"||len(relative_paths)>maximum_files{return {\"ok\":false,\"error\":\"tree root or file-count bound is invalid\"}};mut entries:=[];for relative in sort(relative_paths){if !safe_relative(relative){return {\"ok\":false,\"error\":\"unsafe tree path\"}};path:=root+\"/\"+relative;if !path_is_file(path)||path_is_symlink(path){return {\"ok\":false,\"error\":\"tree entry is missing or unsafe\"}};entries=push(entries,{\"path\":relative,\"bytes\":file_size(path),\"sha256\":sha256_file(path)})};manifest:=checksum_manifest(entries,\"\");manifest[\"streaming\"]=true;manifest[\"files\"]=len(entries);return manifest}",
+          "explanation": "Intermediate directories are joined without symlink checks before file_size and sha256_file.",
+          "id": "tree-leaf-check",
+          "label": "Only leaf symlink rejected",
+          "path": "src/hardening.kujo",
+          "startLine": 10
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Reproduced by tests/audit_test.kujo against baseline, then verified rejected after component validation."
+      },
+      "extensions": {
+        "evidence": "../repository-hardening.md",
+        "remediationStatus": "fixed"
+      },
+      "findingId": "csf_5b85275a9659e74cbe88475f",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:59731316abbac952b314fb3d01d5e913b6435fa81e42f98dc843e92517689b64"
+      },
+      "identity": {
+        "anchor": "src/hardening.kujo/streaming-tree-hash"
+      },
+      "locations": [
+        {
+          "path": "src/hardening.kujo",
+          "role": "root_control",
+          "startLine": 10
+        }
+      ],
+      "occurrenceId": "occ_d9bc663ad0f53fa5dff79831",
+      "provenance": {
+        "source": "local_plugin"
+      },
+      "remediation": "Reject every relative path component that is a symlink before hashing. Require operator-owned stable roots; do not promise protection from hostile concurrent replacement.",
+      "remediationTests": [
+        "tests/audit_test.kujo: real intermediate symlink is rejected"
+      ],
+      "rootCause": {
+        "summary": "Lexical safe_relative rejects traversal components, but leaf-only symlink checks do not confine filesystem resolution."
+      },
+      "ruleId": "symlink-tree-hash-escape",
+      "severity": {
+        "level": "low",
+        "rationale": "Requires a lower-trust supplied tree; exposes only an outside file hash/size, not contents. No network sink or remote service. Local state is not multitenant."
+      },
+      "summary": "The exported tree hasher checks only the root and final file for symlinks. A supplied root/link/file can hash an outside file through a directory symlink.",
+      "taxonomy": {
+        "category": "symlink-following",
+        "cwe": [
+          "CWE-61"
+        ]
+      },
+      "title": "Intermediate directory symlinks escape the declared hash root",
+      "validation": {
+        "summary": "A real root/link -> outside fixture makes baseline streaming_tree_hash(root,[link/file],10) succeed; the same regression rejects it after the fix."
+      }
+    }
+  ],
+  "scanId": "galleypack-local-20260922",
+  "schemaVersion": "1.0"
+}

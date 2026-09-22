@@ -1,0 +1,49 @@
+{
+  "completeness": "complete",
+  "deferred": [],
+  "documentType": "codex-security.coverage",
+  "excludePaths": [],
+  "explicitExclusions": [],
+  "includePaths": [
+    "."
+  ],
+  "inventoryStrategy": "repository",
+  "mode": "repository",
+  "openQuestions": [
+    {
+      "question": "Hostile concurrent root replacement is outside operator-controlled filesystem model; descriptor-relative APIs are required if a future integration needs that boundary."
+    }
+  ],
+  "scanId": "galleypack-local-20260922",
+  "schemaVersion": "1.0",
+  "surfaces": [
+    {
+      "disposition": "reported",
+      "id": "tree",
+      "label": "Optional library manifest/tree paths",
+      "notes": "All src/hardening.kujo reviewed. Intermediate symlink reproduced; duplicates, collisions, false signing and size limits fixed as documented correctness/defense improvements.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "storage",
+      "label": "Local state, concurrency, immutability and export",
+      "notes": "src/storage.kujo and src/core.kujo fully reviewed. Operator-controlled state per SECURITY.md. Nonexclusive create_dir locks and overwrite=true fixed as data-integrity defects. No separate multitenant vulnerability claimed.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "inputs",
+      "label": "CLI, configuration, domain validation and schemas",
+      "notes": "All src/args.kujo, src/common.kujo, src/domain.kujo, src/profile.kujo, schemas and fixtures reviewed. JSON parsing and safe record IDs prevent traversal. Dry-run, missing flag values, UTF-8 bounds, calendar dates and truncated validation fixed.",
+      "receiptRefs": []
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "build",
+      "label": "Launchers, CI, tests, docs and dependency contracts",
+      "notes": "All tracked baseline files inspected. Only Kujo runtime dependency, pinned CI actions/source; no application network/subprocess or hosted service. Test subprocesses fixed argv and bounded. Docs corrected to describe library plans and local authority.",
+      "receiptRefs": []
+    }
+  ]
+}

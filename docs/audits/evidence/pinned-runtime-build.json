@@ -1,0 +1,8 @@
+{
+  "source_commit": "5059695d14d6726bc17fef55e0b95511624967cf",
+  "command": "cargo build --release --locked --no-default-features --manifest-path $AUDIT/kujo-pinned/Cargo.toml",
+  "result": "passed",
+  "version": "kujo 1.0.2",
+  "sha256": "a47ed4cabf57992e3f64a5286994729a265637f9be4c6e26c6c549aa490fb287",
+  "note": "Warnings retained in local pinned-minimal-build.log; 26m 28s observed under competing local builds, not a performance baseline."
+}

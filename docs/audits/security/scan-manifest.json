@@ -1,0 +1,82 @@
+{
+  "documentType": "codex-security.scan-manifest",
+  "scan": {
+    "artifacts": [
+      {
+        "mediaType": "application/json",
+        "path": "findings.json",
+        "sha256": "d534e9f4986ca9af363ebecb0d39ddcfd91a1faa29850bbcda8436d95a304ec4"
+      },
+      {
+        "mediaType": "application/json",
+        "path": "coverage.json",
+        "sha256": "0baa41656e96b70b9152ee18de16d36f46f34b72c1f730adbd53a8a3621c18fc"
+      }
+    ],
+    "completedAt": "2026-09-22T17:32:16.211175+00:00",
+    "coverageRef": "coverage.json",
+    "findingsRef": "findings.json",
+    "id": "galleypack-local-20260922",
+    "producer": {
+      "name": "codex-security-plugin",
+      "version": "0.1.24"
+    },
+    "scope": {
+      "excludePaths": [],
+      "includePaths": [
+        "."
+      ],
+      "runtimeStatus": "Kujo 1.4.0 local baseline; CI-pinned runtime verification separately recorded.",
+      "summary": "Whole tracked repository baseline; dynamic tests isolated in temporary directories; independent static review and architecture review.",
+      "validationMode": "Source review and local regression reproduction"
+    },
+    "sealedAt": "2026-09-22T17:32:16.211175+00:00",
+    "startedAt": "2026-09-22T17:12:00Z",
+    "status": "completed",
+    "target": {
+      "displayName": "kujolang/galleypack",
+      "kind": "git_revision",
+      "remote": "https://github.com/kujolang/galleypack",
+      "revision": "5a9ec247f943460aa759f1552ae14e48c7423d3e",
+      "targetId": "galleypack-3befaac6903e3ebd04add1f3509f787e9aced89e472f4e0385a9a4ccb704e8db"
+    },
+    "threatModel": {
+      "assets": [
+        "Record and audit integrity: <state>/records/<id>.json; <state>/history/<sha256(timestamp+newline+id)[0:32]>.json; <state>/locks/<id>.lock; <state>/metadata.json (src/storage.kujo:35-76).",
+        "Operator-selected source files and output filesystem; sources must remain unchanged (src/core.kujo:55,107).",
+        "Caller-owned HMAC signing key is consumed but not persisted by checksum_manifest (src/hardening.kujo:8).",
+        "Bounded processing of config, payloads, records, artifacts and optional manifest/tree library inputs (src/core.kujo:26-60; src/hardening.kujo:6-10)."
+      ],
+      "assumptions": [
+        "All cited source coordinates refer to starting revision 5a9ec247f943460aa759f1552ae14e48c7423d3e.",
+        "Local state and caller-selected root ancestors are trusted; simultaneous adversarial filesystem replacement is not a supported sandbox boundary. POSIX launchers; Windows support not established.",
+        "README minimum Kujo 1.0.1 is descriptive; version/doctor do not interrogate the runtime. CI actually pins 1.0.2 source.",
+        "Baseline docs overstated archive execution and a 100,000-file hash bound; helpers return plans and the tree receipt delegated to a 10,000-entry limit. Fixed/documented in repository-hardening.md.",
+        "Baseline history command lists records rather than audit events; retain that CLI behavior.",
+        "Standard capability preflight ready; native V2 cap 4 permits 3 workers. Daybreak granted/Daybreak Blue. Workbench launcher failed with Python TypeError; prompt-only local contract uses Python 3.11."
+      ],
+      "attackerCapabilities": [
+        "A contributor may supply a tree, manifest, JSON input or artifact that an operator chooses to process; they do not thereby control CLI configuration, signing keys or the operator account.",
+        "A tree supplier may include symlink directories pointing outside the declared root.",
+        "Remote/multitenant exposure is not established. An actor who already controls operator state has no new authorization boundary to cross (SECURITY.md:3)."
+      ],
+      "securityObjectives": [
+        "Preserve immutable IDs, exact artifact hashes, append-only audit behavior and safe explicit output writes.",
+        "Keep processing bounded and offline; reject malformed input and secret-shaped record fields.",
+        "Separate review assertions from approval or publishing authority.",
+        "Reject tree paths that redirect declared-root hashing outside that root."
+      ],
+      "summary": "Operator-run offline Kujo CLI binds editorial artifact bytes and assertions to immutable records and SHA-256 hashes. bin/galleypack:3 selects the runtime; galleypack.kujo calls src/core.kujo:176 main. Optional src/hardening.kujo exports are not CLI commands. No network, publishing, archive execution or credential retrieval is implemented.",
+      "trustBoundaries": [
+        "CLI/config/input to core: allowed flags, object parsing, schema-major and recursive sensitive-key checks, actor/timestamp and domain validation (src/core.kujo:26-81). Actor is an assertion, not authenticated identity.",
+        "Explicit --path to regular-file and size checks to SHA-256. Stored relative paths resolve against invocation CWD (src/core.kujo:55,95).",
+        "State precedence: nonempty --state, config.state, .galleypack. Safe IDs and managed-directory checks protect ordinary cooperating operations; local state is operator controlled (src/core.kujo:35; src/storage.kujo:27-89; SECURITY.md:3).",
+        "Export uses literal --output and --force to authorize replacement, with leaf-symlink and size checks (src/core.kujo:107).",
+        "Library caller chooses output_root/root and supplies manifest or relative paths; entries cross into filesystem operations under that chosen root (src/hardening.kujo:3-10).",
+        "Adapter descriptions only assert offline behavior, normalized timestamps and ordering; no external execution is enforced or performed (src/hardening.kujo:12-17).",
+        "Operator chooses KUJO_BIN; CI builds commit 5059695d14d6726bc17fef55e0b95511624967cf with pinned actions and contents:read permissions (.github/workflows/validate.yml:5-25)."
+      ]
+    }
+  },
+  "schemaVersion": "1.0"
+}
