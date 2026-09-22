@@ -1,3 +1,4 @@
+from tests.support import cleanup
 from src.core import dispatch
 from src.args import parse_args
 mut passed:=0;mut failed:=0
@@ -12,4 +13,6 @@ second:=dispatch("freeze",opts(["--state",root,"--input",package,"--path",two,"-
 comparison:=dispatch("diff",opts(["--state",root,"--id","package-demo-v1","--other-id","package-demo-v2"]));check(comparison["ok"]&&!comparison["value"]["artifact_equal"],"package diff detects artifact change")
 append_file(one,"x");check(!dispatch("validate",opts(["--state",root,"--id","package-demo-v1"]))["ok"],"post-freeze drift fails")
 for path in [one,two,package]{if file_exists(path){delete_file(path)}}
+
+cleanup(root)
 print(to_string(passed)+" passed; "+to_string(failed)+" failed");if failed>0{exit(1)}

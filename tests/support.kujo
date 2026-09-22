@@ -1,0 +1,15 @@
+from src.common import is_symlink
+
+export func cleanup(path) {
+    if is_symlink(path) {
+        removed := spawn_process(["unlink", path], {"timeout_ms":5000,"max_output_bytes":4096})
+        assert(removed.exitcode == 0, "remove test symlink without following it")
+        return true
+    }
+    if !file_exists(path) { return true }
+    if path_is_dir(path) {
+        for name in list_dir(path) { cleanup(path + "/" + name) }
+        os_rmdir(path)
+    } else { delete_file(path) }
+    return true
+}

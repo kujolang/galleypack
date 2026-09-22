@@ -40,7 +40,8 @@ func parse_args(tokens, bool_flags) {
                 } else if has_key(flags, name) == 1 {
                     errors = push(errors, "duplicate flag: --" + name)
                 } else {
-                    flags[name] := substring(token, eq_index + 1, len(token))
+                    value := substring(token, eq_index + 1, len(token))
+                    if value == "" { errors = push(errors, "missing value for --" + name) } else { flags[name] := value }
                 }
                 i = i + 1
                 continue
@@ -61,7 +62,7 @@ func parse_args(tokens, bool_flags) {
                 i = i + 2
                 continue
             }
-            flags[name] := ""
+            errors = push(errors, "missing value for --" + name)
             i = i + 1
             continue
         }

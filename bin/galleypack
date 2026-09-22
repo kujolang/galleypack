@@ -1,4 +1,15 @@
 #!/bin/sh
 set -eu
-KUJO_BIN=${KUJO_BIN:-/Users/robertdevore/2026/Kujolang/kujo-repos/kujo/target/release/kujo}
-exec "$KUJO_BIN" run "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)/galleypack.kujo" -- "$@"
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+if [ -z "${KUJO_BIN:-}" ]; then
+    if command -v kujo >/dev/null 2>&1; then
+        KUJO_BIN=$(command -v kujo)
+    else
+        KUJO_BIN="$ROOT/../kujo/target/release/kujo"
+    fi
+fi
+if [ ! -x "$KUJO_BIN" ]; then
+    printf 'GalleyPack: Kujo runtime not found; set KUJO_BIN.\n' >&2
+    exit 2
+fi
+exec "$KUJO_BIN" run "$ROOT/galleypack.kujo" -- "$@"

@@ -1,3 +1,4 @@
+from tests.support import cleanup
 from src.core import dispatch
 from src.args import parse_args
 mut passed:=0;mut failed:=0
@@ -14,4 +15,6 @@ create_dir(root+"/locks/artifact-locked.lock");check(!dispatch("add",opts(["--st
 delete_file(secret);delete_file(artifact)
 foreign_state:=root+"-foreign";check(dispatch("init",opts(["--state",foreign_state]))["ok"],"foreign state baseline");write_file(foreign_state+"/metadata.json","{\"schema_version\":\"1.0.0\",\"tool\":\"other-tool\",\"contract_version\":\"1.0.0\"}",true);check(!dispatch("init",opts(["--state",foreign_state]))["ok"],"incompatible state rejected")
 symlink_state:=root+"-symlink";outside_state:=root+"-outside";create_dir(symlink_state);create_dir(outside_state);linked:=spawn_process(["ln","-s",outside_state,symlink_state+"/records"],{"timeout_ms":5000,"max_output_bytes":4096});if linked.exitcode==0{check(!dispatch("init",opts(["--state",symlink_state]))["ok"],"managed directory symlink rejected")}
+
+cleanup(root); cleanup(foreign_state); cleanup(symlink_state); cleanup(outside_state)
 print(to_string(passed)+" passed; "+to_string(failed)+" failed");if failed>0{exit(1)}

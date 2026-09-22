@@ -1,0 +1,25 @@
+from tests.support import cleanup
+runtime := args()[0]
+root := "/tmp/galleypack-cli-" + uuid_v4(); create_dir(root)
+func cli(tokens) { return spawn_process(concat([runtime,"run","galleypack.kujo","--"],tokens), {"timeout_ms":10000,"max_output_bytes":16384}) }
+version := cli(["--version","--json"])
+assert(version.exitcode == 0 && parse_json(version.stdout)["ok"], "version alias honors JSON")
+missing := cli(["report","--state"]); assert(missing.exitcode == 2, "missing flag value exits 2")
+unknown := cli(["--version","--unknown","x"]); assert(unknown.exitcode == 2, "version validates options")
+config := root + "/bad.json"; write_file(config, "{\"state\":42}", true)
+bad := cli(["report","--config",config,"--json"])
+assert(bad.exitcode == 1 && parse_json(bad.stdout)["error_code"] == "invalid_config", "malformed config returns JSON failure")
+dry := cli(["init","--state",root + "/dry","--dry-run","--json"])
+assert(dry.exitcode == 0 && !file_exists(root + "/dry"), "init dry run does not write")
+exported := cli(["export","--state",root + "/absent","--output",root + "/export.json","--dry-run","--json"])
+assert(exported.exitcode == 0 && !file_exists(root + "/export.json"), "export dry run does not write")
+link := root + "/dangling"
+assert(spawn_process(["ln","-s",root + "/missing",link], {"timeout_ms":5000,"max_output_bytes":4096}).exitcode == 0, "dangling fixture")
+unsafe := cli(["export","--state",root + "/absent","--output",link,"--force","--json"])
+assert(unsafe.exitcode == 1 && parse_json(unsafe.stdout)["error_code"] == "unsafe_output", "force cannot replace dangling symlink")
+failed := cli(["export","--state",root + "/absent","--output",root + "/missing/out.json","--json"])
+assert(failed.exitcode == 1 && parse_json(failed.stdout)["error_code"] == "write_failed", "write failure preserves envelope")
+launcher := spawn_process(["./bin/galleypack","--version","--json"], {"env":{"KUJO_BIN":runtime},"timeout_ms":10000,"max_output_bytes":4096})
+assert(launcher.exitcode == 0 && parse_json(launcher.stdout)["ok"], "launcher honors explicit runtime")
+cleanup(root)
+print("10 CLI contract assertions passed")

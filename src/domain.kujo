@@ -5,6 +5,7 @@ func require_text(payload,key){value:=get(payload,key,"");if type(value)!="strin
 func require_id(payload,key){error:=require_text(payload,key);if error!=""{return error};if !safe_id(payload[key]){return "invalid record reference: "+key};return ""}
 func valid_ids(value){if type(value)!="array"||len(value)==0||len(value)>1000{return false};for id in value{if !safe_id(id){return false}};return true}
 export func validate_command(command,payload,artifact){
+    if !has(["add","relate","evidence attach","review attach","build","freeze"],command){return "unsupported: command cannot create records"}
     if command=="add"{if type(artifact)!="dict"{return "add requires --path"};return require_text(payload,"artifact_kind")}
     if command=="relate"{for key in ["artifact_id","related_artifact_id"]{error:=require_id(payload,key);if error!=""{return error}};error:=require_text(payload,"relationship");if error!=""{return error};if payload["artifact_id"]==payload["related_artifact_id"]{return "artifact cannot relate to itself"};if !has(["source","derivative","adaptation","variant","replacement"],payload["relationship"]){return "invalid artifact relationship"}}
     if command=="evidence attach"{for key in ["artifact_id","evidence_id"]{error:=require_id(payload,key);if error!=""{return error}}}
